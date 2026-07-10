@@ -19,6 +19,7 @@ type Config struct {
 	RedirectURL   string   `json:"redirectUrl"`
 	Scopes        []string `json:"scopes"`
 	AutoProvision bool     `json:"autoProvision"`
+	AutoRedirect  bool     `json:"autoRedirect"`
 	AdminClaim    string   `json:"adminClaim"`
 	AdminValue    string   `json:"adminValue"`
 	GroupsClaim   string   `json:"groupsClaim"`
@@ -34,6 +35,7 @@ func Load() Config {
 		RedirectURL:   conf.Server.OIDC.RedirectURL,
 		Scopes:        conf.Server.OIDC.Scopes,
 		AutoProvision: conf.Server.OIDC.AutoProvision,
+		AutoRedirect:  conf.Server.OIDC.AutoRedirect,
 		AdminClaim:    conf.Server.OIDC.AdminClaim,
 		AdminValue:    conf.Server.OIDC.AdminValue,
 		GroupsClaim:   conf.Server.OIDC.GroupsClaim,
@@ -84,6 +86,7 @@ func LoadFromDB(ctx context.Context, ds model.DataStore) (Config, error) {
 	}
 	cfg.Enabled = dbCfg.Enabled
 	cfg.AutoProvision = dbCfg.AutoProvision
+	cfg.AutoRedirect = dbCfg.AutoRedirect
 
 	return cfg, nil
 }

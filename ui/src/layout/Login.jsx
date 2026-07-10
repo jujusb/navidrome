@@ -112,7 +112,7 @@ const renderInput = ({
   />
 )
 
-const FormLogin = ({ loading, handleSubmit, validate }) => {
+const FormLogin = ({ loading, handleSubmit, validate, oidcEnabled }) => {
   const translate = useTranslate()
   const classes = useStyles()
 
@@ -178,6 +178,19 @@ const FormLogin = ({ loading, handleSubmit, validate }) => {
                   {loading && <CircularProgress size={25} thickness={2} />}
                   {translate('ra.auth.sign_in')}
                 </Button>
+                {oidcEnabled && (
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    fullWidth
+                    className={classes.button}
+                    onClick={() => {
+                      window.location.href = baseUrl('/api/oauth/login')
+                    }}
+                  >
+                    Login with SSO
+                  </Button>
+                )}
               </CardActions>
             </Card>
             <Notification />
@@ -188,63 +201,7 @@ const FormLogin = ({ loading, handleSubmit, validate }) => {
   )
 }
 
-const InsightsNotice = ({ url }) => {
-  const translate = useTranslate()
-  const classes = useStyles()
-
-  const anchorRegex = /\[(.+?)]/g
-  const originalMsg = translate('ra.auth.insightsCollectionNote')
-
-  // Split the entire message on newlines
-  const lines = originalMsg.split('\n')
-
-  const renderedLines = lines.map((line, lineIndex) => {
-    const segments = []
-    let lastIndex = 0
-    let match
-
-    // Find bracketed text in each line
-    while ((match = anchorRegex.exec(line)) !== null) {
-      // match.index is where "[something]" starts
-      // match[1] is the text inside the brackets
-      const bracketText = match[1]
-
-      // Push the text before the bracket
-      segments.push(line.slice(lastIndex, match.index))
-
-      // Push the <Link> component
-      segments.push(
-        <Link
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          key={`${lineIndex}-${match.index}`}
-          style={{ cursor: 'pointer' }}
-        >
-          {bracketText}
-        </Link>,
-      )
-
-      // Update lastIndex to the character right after the bracketed text
-      lastIndex = match.index + match[0].length
-    }
-
-    // Push the remaining text after the last bracket
-    segments.push(line.slice(lastIndex))
-
-    // Return this line’s parts, plus a <br/> if not the last line
-    return (
-      <React.Fragment key={lineIndex}>
-        {segments}
-        {lineIndex < lines.length - 1 && <br />}
-      </React.Fragment>
-    )
-  })
-
-  return <div className={classes.message}>{renderedLines}</div>
-}
-
-const FormSignUp = ({ loading, handleSubmit, validate }) => {
+const FormSignUp = ({ loading, handleSubmit, validate, oidcEnabled }) => {
   const translate = useTranslate()
   const classes = useStyles()
 
@@ -285,6 +242,15 @@ const FormSignUp = ({ loading, handleSubmit, validate }) => {
                     disabled={loading}
                   />
                 </div>
+                <div className={classes.input}>
+                  <Field
+                    name="confirmPassword"
+                    component={renderInput}
+                    label={translate('ra.auth.confirmPassword')}
+                    type="password"
+                    disabled={loading}
+                  />
+                </div>
               </div>
               <CardActions className={classes.actions}>
                 <Button
@@ -296,21 +262,8 @@ const FormSignUp = ({ loading, handleSubmit, validate }) => {
                   fullWidth
                 >
                   {loading && <CircularProgress size={25} thickness={2} />}
-                  {translate('ra.auth.sign_in')}
+                  {translate('ra.auth.buttonCreateAdmin')}
                 </Button>
-                {config.oidcEnabled && (
-                  <Button
-                    variant="outlined"
-                    color="secondary"
-                    fullWidth
-                    className={classes.button}
-                    onClick={() => {
-                      window.location.href = baseUrl('/api/oauth/login')
-                    }}
-                  >
-                    Login with SSO
-                  </Button>
-                )}
               </CardActions>
               <InsightsNotice url={INSIGHTS_DOC_URL} />
             </Card>
@@ -324,10 +277,33 @@ const FormSignUp = ({ loading, handleSubmit, validate }) => {
 
 const Login = ({ location }) => {
   const [loading, setLoading] = useState(false)
+  const [oidcEnabled, setOidcEnabled] = useState(false)
   const translate = useTranslate()
   const notify = useNotify()
   const login = useLogin()
   const dispatch = useDispatch()
+
+  useEffect(() => {
+    const checkOIDC = () => {
+      fetch(baseUrl('/api/oauth/status'))
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.issuer && data.clientId && data.enabled) {
+            setOidcEnabled(true)
+            const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
+            if (data.autoRedirect && !params.has('local') && !window.location.hash.includes('token=')) {
+              window.location.href = baseUrl('/api/oauth/login')
+            }
+          } else {
+            setOidcEnabled(false)
+          }
+        })
+        .catch(() => {})
+    }
+    checkOIDC()
+    window.addEventListener('focus', checkOIDC)
+    return () => window.removeEventListener('focus', checkOIDC)
+  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -348,6 +324,8 @@ const Login = ({ location }) => {
         if (avatar) localStorage.setItem('avatar', avatar)
         localStorage.setItem('role', isAdmin ? 'admin' : 'regular')
         localStorage.setItem('is-authenticated', 'true')
+        const idToken = params.get('idToken') || ''
+        if (idToken) localStorage.setItem('id_token', idToken)
 
         window.location.hash = '#/'
         window.location.reload()
@@ -416,6 +394,7 @@ const Login = ({ location }) => {
         handleSubmit={handleSubmit}
         validate={validateSignup}
         loading={loading}
+        oidcEnabled={oidcEnabled}
       />
     )
   }
@@ -424,6 +403,7 @@ const Login = ({ location }) => {
       handleSubmit={handleSubmit}
       validate={validateLogin}
       loading={loading}
+      oidcEnabled={oidcEnabled}
     />
   )
 }

@@ -56,9 +56,10 @@ const OIDCSettings = () => {
     issuer: '',
     clientId: '',
     clientSecret: '',
-    redirectUrl: '',
+    redirectUrl: window.location.protocol + '//' + window.location.host + '/api/oauth/callback',
     scopes: ['openid', 'profile', 'email'],
     autoProvision: true,
+    autoRedirect: false,
     adminClaim: '',
     adminValue: '',
     groupsClaim: 'groups',
@@ -67,7 +68,7 @@ const OIDCSettings = () => {
   useEffect(() => {
     fetch(baseUrl('/api/oidc-config'), {
       headers: {
-        Authorization: 'Bearer ' + localStorage.getItem('token'),
+        'X-ND-Authorization': 'Bearer ' + localStorage.getItem('token'),
       },
     })
       .then((res) => res.json())
@@ -100,7 +101,7 @@ const OIDCSettings = () => {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + localStorage.getItem('token'),
+        'X-ND-Authorization': 'Bearer ' + localStorage.getItem('token'),
       },
       body: JSON.stringify(config),
     })
@@ -217,6 +218,17 @@ const OIDCSettings = () => {
               />
             }
             label="Auto-provision users (create on first login)"
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={config.autoRedirect}
+                onChange={handleChange('autoRedirect')}
+                color="primary"
+              />
+            }
+            label="Auto-redirect to SSO (skip login form)"
           />
 
           <TextField

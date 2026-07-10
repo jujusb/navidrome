@@ -174,7 +174,7 @@ const Admin = (props) => {
             options={{ subMenu: 'settings' }}
           />
         ) : null,
-        permissions === 'admin' && config.oidcEnabled ? (
+        permissions === 'admin' ? (
           <Resource
             name="oidc-config"
             {...oidc}

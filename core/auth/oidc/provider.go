@@ -26,6 +26,8 @@ type Claims struct {
 	EmailVerified     bool     `json:"email_verified"`
 	Name              string   `json:"name"`
 	Groups            []string `json:"groups"`
+	Roles             []string `json:"roles"`
+	All               map[string]any
 }
 
 type oidcConfig struct {
@@ -34,6 +36,7 @@ type oidcConfig struct {
 	TokenEndpoint         string `json:"token_endpoint"`
 	JWKSUri               string `json:"jwks_uri"`
 	UserinfoEndpoint      string `json:"userinfo_endpoint"`
+	EndSessionEndpoint    string `json:"end_session_endpoint"`
 }
 
 type jwks struct {
@@ -84,7 +87,7 @@ func (p *OIDCIdentityProvider) Enabled() bool {
 	return o.Enabled && o.Issuer != "" && o.ClientID != ""
 }
 
-func (p *OIDCIdentityProvider) AuthCodeURL(state, nonce string) (string, error) {
+func (p *OIDCIdentityProvider) AuthCodeURL(state, nonce, redirectURL string) (string, error) {
 	cfg, err := p.getConfig()
 	if err != nil {
 		return "", err
@@ -97,14 +100,26 @@ func (p *OIDCIdentityProvider) AuthCodeURL(state, nonce string) (string, error) 
 		cfg.AuthorizationEndpoint,
 		url.QueryEscape(o.ClientID),
 		scopes,
-		url.QueryEscape(o.RedirectURL),
+		url.QueryEscape(redirectURL),
 		url.QueryEscape(state),
 		url.QueryEscape(nonce),
 	)
 	return u, nil
 }
 
-func (p *OIDCIdentityProvider) Exchange(ctx context.Context, code string) (idToken string, accessToken string, err error) {
+func (p *OIDCIdentityProvider) LogoutURL(postLogoutRedirectURI, idTokenHint string) string {
+	cfg, err := p.getConfig()
+	if err != nil || cfg.EndSessionEndpoint == "" {
+		return ""
+	}
+	u := cfg.EndSessionEndpoint + "?post_logout_redirect_uri=" + url.QueryEscape(postLogoutRedirectURI)
+	if idTokenHint != "" {
+		u += "&id_token_hint=" + url.QueryEscape(idTokenHint)
+	}
+	return u
+}
+
+func (p *OIDCIdentityProvider) Exchange(ctx context.Context, code, redirectURL string) (idToken string, accessToken string, err error) {
 	cfg, err := p.getConfig()
 	if err != nil {
 		return "", "", err
@@ -115,7 +130,7 @@ func (p *OIDCIdentityProvider) Exchange(ctx context.Context, code string) (idTok
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
 	data.Set("code", code)
-	data.Set("redirect_uri", o.RedirectURL)
+	data.Set("redirect_uri", redirectURL)
 	data.Set("client_id", o.ClientID)
 	data.Set("client_secret", o.ClientSecret)
 
@@ -224,6 +239,11 @@ func (p *OIDCIdentityProvider) VerifyIDToken(ctx context.Context, rawIDToken str
 	var claims Claims
 	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
 		return nil, fmt.Errorf("oidc: parsing claims: %w", err)
+	}
+
+	var rawClaims map[string]any
+	if err := json.Unmarshal(payloadBytes, &rawClaims); err == nil {
+		claims.All = rawClaims
 	}
 
 	return &claims, nil

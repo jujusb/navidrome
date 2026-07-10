@@ -278,6 +278,7 @@ type oidcOptions struct {
 	RedirectURL   string
 	Scopes        []string
 	AutoProvision bool
+	AutoRedirect  bool
 	AdminClaim    string
 	AdminValue    string
 	GroupsClaim   string
@@ -828,6 +829,7 @@ func setViperDefaults() {
 	viper.SetDefault("oidc.redirecturl", "")
 	viper.SetDefault("oidc.scopes", []string{"openid", "profile", "email"})
 	viper.SetDefault("oidc.autoprovision", true)
+	viper.SetDefault("oidc.autoredirect", false)
 	viper.SetDefault("oidc.adminclaim", "")
 	viper.SetDefault("oidc.adminvalue", "")
 	viper.SetDefault("oidc.groupsclaim", "groups")

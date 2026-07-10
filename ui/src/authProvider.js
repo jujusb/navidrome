@@ -65,9 +65,14 @@ const authProvider = {
   },
 
   logout: () => {
+    const idToken = localStorage.getItem('id_token')
     removeItems()
     if (config.extAuthLogoutURL) {
       window.location.href = config.extAuthLogoutURL
+      return Promise.resolve(false)
+    }
+    if (idToken) {
+      window.location.href = baseUrl('/api/oauth/logout?id_token=' + encodeURIComponent(idToken))
       return Promise.resolve(false)
     }
     return Promise.resolve()
@@ -110,6 +115,7 @@ const removeItems = () => {
   localStorage.removeItem('subsonic-salt')
   localStorage.removeItem('subsonic-token')
   localStorage.removeItem('is-authenticated')
+  localStorage.removeItem('id_token')
 }
 
 export default authProvider

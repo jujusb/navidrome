@@ -35,6 +35,11 @@ type PluginManager interface {
 	UnloadDisabledPlugins(ctx context.Context)
 }
 
+// OIDCProviderResetter allows resetting the OIDC provider's cached state
+type OIDCProviderResetter interface {
+	ResetOIDCProvider()
+}
+
 type Router struct {
 	http.Handler
 	ds            model.DataStore
@@ -46,12 +51,18 @@ type Router struct {
 	maintenance   core.Maintenance
 	pluginManager PluginManager
 	imgUpload     core.ImageUploadService
+	oidcResetter  OIDCProviderResetter
 }
 
 func New(ds model.DataStore, share core.Share, playlists playlistsvc.Playlists, insights metrics.Insights, libraryService core.Library, userService core.User, maintenance core.Maintenance, pluginManager PluginManager, imgUpload core.ImageUploadService) *Router {
 	r := &Router{ds: ds, share: share, playlists: playlists, insights: insights, libs: libraryService, users: userService, maintenance: maintenance, pluginManager: pluginManager, imgUpload: imgUpload}
 	r.Handler = r.routes()
 	return r
+}
+
+func (api *Router) WithOIDCResetter(r OIDCProviderResetter) *Router {
+	api.oidcResetter = r
+	return api
 }
 
 func (api *Router) routes() http.Handler {
@@ -265,7 +276,7 @@ func (api *Router) saveOIDCConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	existingCfg, err := oidcCfg.LoadFromDB(r.Context(), api.ds)
-	if err == nil && cfg.ClientSecret == "****" {
+	if err == nil && isRedacted(cfg.ClientSecret, existingCfg.ClientSecret) {
 		cfg.ClientSecret = existingCfg.ClientSecret
 	}
 
@@ -282,9 +293,14 @@ func (api *Router) saveOIDCConfig(w http.ResponseWriter, r *http.Request) {
 	conf.Server.OIDC.RedirectURL = cfg.RedirectURL
 	conf.Server.OIDC.Scopes = cfg.Scopes
 	conf.Server.OIDC.AutoProvision = cfg.AutoProvision
+	conf.Server.OIDC.AutoRedirect = cfg.AutoRedirect
 	conf.Server.OIDC.AdminClaim = cfg.AdminClaim
 	conf.Server.OIDC.AdminValue = cfg.AdminValue
 	conf.Server.OIDC.GroupsClaim = cfg.GroupsClaim
+
+	if api.oidcResetter != nil {
+		api.oidcResetter.ResetOIDCProvider()
+	}
 
 	_ = rest.RespondWithJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
@@ -297,6 +313,13 @@ func redactOIDCSecret(secret string) string {
 		return "****"
 	}
 	return string(secret[0]) + "****" + string(secret[len(secret)-1])
+}
+
+func isRedacted(incoming, existing string) bool {
+	if incoming == redactOIDCSecret(existing) {
+		return true
+	}
+	return false
 }
 
 func (api *Router) addKeepAliveRoute(r chi.Router) {
