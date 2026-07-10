@@ -112,7 +112,7 @@ const renderInput = ({
   />
 )
 
-const FormLogin = ({ loading, handleSubmit, validate, oidcEnabled }) => {
+const FormLogin = ({ loading, handleSubmit, validate, oidcEnabled, oidcButtonText }) => {
   const translate = useTranslate()
   const classes = useStyles()
 
@@ -188,7 +188,7 @@ const FormLogin = ({ loading, handleSubmit, validate, oidcEnabled }) => {
                       window.location.href = baseUrl('/api/oauth/login')
                     }}
                   >
-                    Login with SSO
+                    {oidcButtonText || 'Login with SSO'}
                   </Button>
                 )}
               </CardActions>
@@ -278,6 +278,7 @@ const FormSignUp = ({ loading, handleSubmit, validate, oidcEnabled }) => {
 const Login = ({ location }) => {
   const [loading, setLoading] = useState(false)
   const [oidcEnabled, setOidcEnabled] = useState(false)
+  const [oidcButtonText, setOidcButtonText] = useState('Login with SSO')
   const translate = useTranslate()
   const notify = useNotify()
   const login = useLogin()
@@ -290,6 +291,7 @@ const Login = ({ location }) => {
         .then((data) => {
           if (data && data.issuer && data.clientId && data.enabled) {
             setOidcEnabled(true)
+            if (data.buttonText) setOidcButtonText(data.buttonText)
             const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
             if (data.autoRedirect && !params.has('local') && !window.location.hash.includes('token=')) {
               window.location.href = baseUrl('/api/oauth/login')
@@ -395,6 +397,7 @@ const Login = ({ location }) => {
         validate={validateSignup}
         loading={loading}
         oidcEnabled={oidcEnabled}
+        oidcButtonText={oidcButtonText}
       />
     )
   }
@@ -404,6 +407,7 @@ const Login = ({ location }) => {
       validate={validateLogin}
       loading={loading}
       oidcEnabled={oidcEnabled}
+      oidcButtonText={oidcButtonText}
     />
   )
 }

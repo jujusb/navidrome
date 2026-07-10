@@ -133,6 +133,10 @@ func startServer(ctx context.Context) func() error {
 			conf.Server.OIDC.AdminClaim = oidcDB.AdminClaim
 			conf.Server.OIDC.AdminValue = oidcDB.AdminValue
 			conf.Server.OIDC.GroupsClaim = oidcDB.GroupsClaim
+			conf.Server.OIDC.SigningAlgorithm = oidcDB.SigningAlgorithm
+			conf.Server.OIDC.AllowedRedirectURIs = oidcDB.AllowedRedirectURIs
+			conf.Server.OIDC.ButtonText = oidcDB.ButtonText
+			conf.Server.OIDC.MatchBy = oidcDB.MatchBy
 		}
 		a.MountRouter("Native API", consts.URLPathNativeAPI, CreateNativeAPIRouter(ctx).WithOIDCResetter(oidcRouter))
 		a.MountRouter("Subsonic API", consts.URLPathSubsonicAPI, CreateSubsonicAPIRouter(ctx))

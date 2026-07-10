@@ -297,6 +297,10 @@ func (api *Router) saveOIDCConfig(w http.ResponseWriter, r *http.Request) {
 	conf.Server.OIDC.AdminClaim = cfg.AdminClaim
 	conf.Server.OIDC.AdminValue = cfg.AdminValue
 	conf.Server.OIDC.GroupsClaim = cfg.GroupsClaim
+	conf.Server.OIDC.SigningAlgorithm = cfg.SigningAlgorithm
+	conf.Server.OIDC.AllowedRedirectURIs = cfg.AllowedRedirectURIs
+	conf.Server.OIDC.ButtonText = cfg.ButtonText
+	conf.Server.OIDC.MatchBy = cfg.MatchBy
 
 	if api.oidcResetter != nil {
 		api.oidcResetter.ResetOIDCProvider()

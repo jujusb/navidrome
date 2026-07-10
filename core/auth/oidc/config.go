@@ -12,33 +12,41 @@ import (
 const oidcConfigPropertyKey = "oidc_config"
 
 type Config struct {
-	Enabled       bool     `json:"enabled"`
-	Issuer        string   `json:"issuer"`
-	ClientID      string   `json:"clientId"`
-	ClientSecret  string   `json:"clientSecret"`
-	RedirectURL   string   `json:"redirectUrl"`
-	Scopes        []string `json:"scopes"`
-	AutoProvision bool     `json:"autoProvision"`
-	AutoRedirect  bool     `json:"autoRedirect"`
-	AdminClaim    string   `json:"adminClaim"`
-	AdminValue    string   `json:"adminValue"`
-	GroupsClaim   string   `json:"groupsClaim"`
+	Enabled             bool     `json:"enabled"`
+	Issuer              string   `json:"issuer"`
+	ClientID            string   `json:"clientId"`
+	ClientSecret        string   `json:"clientSecret"`
+	RedirectURL         string   `json:"redirectUrl"`
+	Scopes              []string `json:"scopes"`
+	AutoProvision       bool     `json:"autoProvision"`
+	AutoRedirect        bool     `json:"autoRedirect"`
+	AdminClaim          string   `json:"adminClaim"`
+	AdminValue          string   `json:"adminValue"`
+	GroupsClaim         string   `json:"groupsClaim"`
+	SigningAlgorithm    string   `json:"signingAlgorithm"`
+	AllowedRedirectURIs []string `json:"allowedRedirectURIs"`
+	ButtonText          string   `json:"buttonText"`
+	MatchBy             string   `json:"matchBy"`
 }
 
 // Load reads the current OIDC configuration, merging config file values with DB overrides.
 func Load() Config {
 	cfg := Config{
-		Enabled:       conf.Server.OIDC.Enabled,
-		Issuer:        conf.Server.OIDC.Issuer,
-		ClientID:      conf.Server.OIDC.ClientID,
-		ClientSecret:  conf.Server.OIDC.ClientSecret,
-		RedirectURL:   conf.Server.OIDC.RedirectURL,
-		Scopes:        conf.Server.OIDC.Scopes,
-		AutoProvision: conf.Server.OIDC.AutoProvision,
-		AutoRedirect:  conf.Server.OIDC.AutoRedirect,
-		AdminClaim:    conf.Server.OIDC.AdminClaim,
-		AdminValue:    conf.Server.OIDC.AdminValue,
-		GroupsClaim:   conf.Server.OIDC.GroupsClaim,
+		Enabled:             conf.Server.OIDC.Enabled,
+		Issuer:              conf.Server.OIDC.Issuer,
+		ClientID:            conf.Server.OIDC.ClientID,
+		ClientSecret:        conf.Server.OIDC.ClientSecret,
+		RedirectURL:         conf.Server.OIDC.RedirectURL,
+		Scopes:              conf.Server.OIDC.Scopes,
+		AutoProvision:       conf.Server.OIDC.AutoProvision,
+		AutoRedirect:        conf.Server.OIDC.AutoRedirect,
+		AdminClaim:          conf.Server.OIDC.AdminClaim,
+		AdminValue:          conf.Server.OIDC.AdminValue,
+		GroupsClaim:         conf.Server.OIDC.GroupsClaim,
+		SigningAlgorithm:    conf.Server.OIDC.SigningAlgorithm,
+		AllowedRedirectURIs: conf.Server.OIDC.AllowedRedirectURIs,
+		ButtonText:          conf.Server.OIDC.ButtonText,
+		MatchBy:             conf.Server.OIDC.MatchBy,
 	}
 	return cfg
 }
@@ -83,6 +91,18 @@ func LoadFromDB(ctx context.Context, ds model.DataStore) (Config, error) {
 	}
 	if dbCfg.GroupsClaim != "" {
 		cfg.GroupsClaim = dbCfg.GroupsClaim
+	}
+	if dbCfg.SigningAlgorithm != "" {
+		cfg.SigningAlgorithm = dbCfg.SigningAlgorithm
+	}
+	if dbCfg.AllowedRedirectURIs != nil {
+		cfg.AllowedRedirectURIs = dbCfg.AllowedRedirectURIs
+	}
+	if dbCfg.ButtonText != "" {
+		cfg.ButtonText = dbCfg.ButtonText
+	}
+	if dbCfg.MatchBy != "" {
+		cfg.MatchBy = dbCfg.MatchBy
 	}
 	cfg.Enabled = dbCfg.Enabled
 	cfg.AutoProvision = dbCfg.AutoProvision

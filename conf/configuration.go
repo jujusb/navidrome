@@ -271,17 +271,21 @@ type extAuthOptions struct {
 }
 
 type oidcOptions struct {
-	Enabled       bool
-	Issuer        string
-	ClientID      string
-	ClientSecret  string //nolint:gosec
-	RedirectURL   string
-	Scopes        []string
-	AutoProvision bool
-	AutoRedirect  bool
-	AdminClaim    string
-	AdminValue    string
-	GroupsClaim   string
+	Enabled             bool     `mapstructure:"enabled"`
+	Issuer              string   `mapstructure:"issuer"`
+	ClientID            string   `mapstructure:"clientid"`
+	ClientSecret        string   `mapstructure:"clientsecret"` //nolint:gosec
+	RedirectURL         string   `mapstructure:"redirecturl"`
+	Scopes              []string `mapstructure:"scopes"`
+	AutoProvision       bool     `mapstructure:"autoprovision"`
+	AutoRedirect        bool     `mapstructure:"autoredirect"`
+	AdminClaim          string   `mapstructure:"adminclaim"`
+	AdminValue          string   `mapstructure:"adminvalue"`
+	GroupsClaim         string   `mapstructure:"groupsclaim"`
+	SigningAlgorithm    string   `mapstructure:"signingalgorithm"`
+	AllowedRedirectURIs []string `mapstructure:"allowedredirecturis"`
+	ButtonText          string   `mapstructure:"buttontext"`
+	MatchBy             string   `mapstructure:"matchby"`
 }
 
 type searchOptions struct {
@@ -833,6 +837,10 @@ func setViperDefaults() {
 	viper.SetDefault("oidc.adminclaim", "")
 	viper.SetDefault("oidc.adminvalue", "")
 	viper.SetDefault("oidc.groupsclaim", "groups")
+	viper.SetDefault("oidc.signingalgorithm", "RS256")
+	viper.SetDefault("oidc.allowedredirecturis", []string{"navidrome://oauth"})
+	viper.SetDefault("oidc.buttontext", "Login with SSO")
+	viper.SetDefault("oidc.matchby", "username")
 	viper.SetDefault("prometheus.enabled", false)
 	viper.SetDefault("prometheus.metricspath", consts.PrometheusDefaultPath)
 	viper.SetDefault("prometheus.password", "")

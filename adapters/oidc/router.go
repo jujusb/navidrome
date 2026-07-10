@@ -152,12 +152,21 @@ func (s *Router) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := claims.PreferredUsername
-	if username == "" {
+	username := ""
+	o := conf.Server.OIDC
+	switch o.MatchBy {
+	case "email":
 		username = claims.Email
-	}
-	if username == "" {
+	case "subject":
 		username = claims.Subject
+	default:
+		username = claims.PreferredUsername
+		if username == "" {
+			username = claims.Email
+		}
+		if username == "" {
+			username = claims.Subject
+		}
 	}
 
 	identity := &auth.Identity{
@@ -176,7 +185,6 @@ func (s *Router) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	o := conf.Server.OIDC
 	if o.AdminClaim != "" && o.AdminValue != "" {
 		isAdmin := containsAdminClaim(claims, o.AdminClaim, o.AdminValue)
 		if user.IsAdmin != isAdmin {
@@ -220,16 +228,20 @@ func (s *Router) appURL(r *http.Request) string {
 func (s *Router) status(w http.ResponseWriter, r *http.Request) {
 	o := conf.Server.OIDC
 	resp := map[string]any{
-		"enabled":       o.Enabled,
-		"issuer":        o.Issuer,
-		"clientId":      o.ClientID,
-		"redirectUrl":   o.RedirectURL,
-		"autoProvision": o.AutoProvision,
-		"autoRedirect":  o.AutoRedirect,
-		"adminClaim":    o.AdminClaim,
-		"adminValue":    o.AdminValue,
-		"groupsClaim":   o.GroupsClaim,
-		"logoutUrl":     s.provider.LogoutURL(s.appURL(r), ""),
+		"enabled":              o.Enabled,
+		"issuer":               o.Issuer,
+		"clientId":             o.ClientID,
+		"redirectUrl":          o.RedirectURL,
+		"autoProvision":        o.AutoProvision,
+		"autoRedirect":         o.AutoRedirect,
+		"adminClaim":           o.AdminClaim,
+		"adminValue":           o.AdminValue,
+		"groupsClaim":          o.GroupsClaim,
+		"signingAlgorithm":     o.SigningAlgorithm,
+		"buttonText":           o.ButtonText,
+		"matchBy":              o.MatchBy,
+		"allowedRedirectURIs":  o.AllowedRedirectURIs,
+		"logoutUrl":            s.provider.LogoutURL(s.appURL(r), ""),
 	}
 	_ = rest.RespondWithJSON(w, http.StatusOK, resp)
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/rsa"
-	"crypto/sha256"
+	_ "crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -266,6 +266,22 @@ func (p *OIDCIdentityProvider) verifySignature(rawJWT string, kid string) error 
 		return fmt.Errorf("key not found: %s", kid)
 	}
 
+	parts := strings.Split(rawJWT, ".")
+	signingInput := parts[0] + "." + parts[1]
+	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return fmt.Errorf("decoding signature: %w", err)
+	}
+
+	switch key.Kty {
+	case "RSA":
+		return p.verifyRSA(key, signingInput, signature)
+	default:
+		return fmt.Errorf("unsupported key type: %s (only RSA is supported)", key.Kty)
+	}
+}
+
+func (p *OIDCIdentityProvider) verifyRSA(key *jwk, signingInput string, signature []byte) error {
 	nBytes, err := base64.RawURLEncoding.DecodeString(key.N)
 	if err != nil {
 		return fmt.Errorf("decoding modulus: %w", err)
@@ -280,15 +296,19 @@ func (p *OIDCIdentityProvider) verifySignature(rawJWT string, kid string) error 
 		E: int(new(big.Int).SetBytes(eBytes).Int64()),
 	}
 
-	parts := strings.Split(rawJWT, ".")
-	signingInput := parts[0] + "." + parts[1]
-	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
-	if err != nil {
-		return fmt.Errorf("decoding signature: %w", err)
+	var hash crypto.Hash
+	switch key.Alg {
+	case "RS384":
+		hash = crypto.SHA384
+	case "RS512":
+		hash = crypto.SHA512
+	default:
+		hash = crypto.SHA256
 	}
 
-	hash := sha256.Sum256([]byte(signingInput))
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hash[:], signature)
+	h := hash.New()
+	h.Write([]byte(signingInput))
+	return rsa.VerifyPKCS1v15(pubKey, hash, h.Sum(nil), signature)
 }
 
 func (p *OIDCIdentityProvider) GetUserInfo(ctx context.Context, accessToken string) (*Claims, error) {

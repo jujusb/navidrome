@@ -63,6 +63,10 @@ const OIDCSettings = () => {
     adminClaim: '',
     adminValue: '',
     groupsClaim: 'groups',
+    signingAlgorithm: 'RS256',
+    allowedRedirectURIs: ['audiobookshelf://oauth'],
+    buttonText: 'Login with SSO',
+    matchBy: 'username',
   })
 
   useEffect(() => {
@@ -264,6 +268,57 @@ const OIDCSettings = () => {
             value={config.groupsClaim}
             onChange={handleChange('groupsClaim')}
             placeholder="groups"
+            variant="outlined"
+            size="small"
+          />
+
+          <Typography variant="subtitle1" className={classes.section}>
+            Advanced
+          </Typography>
+
+          <TextField
+            className={classes.field}
+            label="Signing Algorithm"
+            value={config.signingAlgorithm || 'RS256'}
+            onChange={handleChange('signingAlgorithm')}
+            placeholder="RS256"
+            helperText="JWT signing algorithm (RS256, RS384, RS512)"
+            variant="outlined"
+            size="small"
+          />
+
+          <TextField
+            className={classes.field}
+            label="Button Text"
+            value={config.buttonText || 'Login with SSO'}
+            onChange={handleChange('buttonText')}
+            placeholder="Login with SSO"
+            helperText="Label for the SSO login button"
+            variant="outlined"
+            size="small"
+          />
+
+          <TextField
+            className={classes.field}
+            label="Match existing users by"
+            value={config.matchBy || 'username'}
+            onChange={handleChange('matchBy')}
+            placeholder="username"
+            helperText="How to match existing users: username, email, or subject"
+            variant="outlined"
+            size="small"
+          />
+
+          <TextField
+            className={classes.field}
+            label="Allowed Mobile Redirect URIs"
+            value={config.allowedRedirectURIs ? config.allowedRedirectURIs.join(', ') : 'audiobookshelf://oauth'}
+            onChange={(e) => setConfig((prev) => ({
+              ...prev,
+              allowedRedirectURIs: e.target.value.split(',').map((s) => s.trim()),
+            }))}
+            placeholder="audiobookshelf://oauth"
+            helperText="Whitelist of valid redirect URIs for mobile apps (comma-separated)"
             variant="outlined"
             size="small"
           />
