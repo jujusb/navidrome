@@ -19,6 +19,8 @@ import (
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/consts"
 	"github.com/navidrome/navidrome/core/auth"
+	pwd "github.com/navidrome/navidrome/core/auth/password"
+	"github.com/navidrome/navidrome/core/auth/proxy"
 	"github.com/navidrome/navidrome/log"
 	"github.com/navidrome/navidrome/model"
 	"github.com/navidrome/navidrome/model/id"
@@ -42,30 +44,30 @@ func login(ds model.DataStore) func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		doLogin(ds, username, password, w, r)
-	}
-}
+		provider := pwd.New(ds.User(r.Context()))
+		identity, err := provider.AuthenticateCredentials(r.Context(), username, password)
+		if err != nil {
+			if errors.Is(err, auth.ErrInvalidCredentials) {
+				log.Warn(r, "Unsuccessful login", "username", username, "request", r.Header)
+				_ = rest.RespondWithError(w, http.StatusUnauthorized, "Invalid username or password")
+				return
+			}
+			log.Error(r, "Error authenticating user", err)
+			_ = rest.RespondWithError(w, http.StatusInternalServerError, "Unknown error authenticating user. Please try again")
+			return
+		}
 
-func doLogin(ds model.DataStore, username string, password string, w http.ResponseWriter, r *http.Request) {
-	user, err := validateLogin(ds.User(r.Context()), username, password)
-	if err != nil {
-		_ = rest.RespondWithError(w, http.StatusInternalServerError, "Unknown error authentication user. Please try again")
-		return
-	}
-	if user == nil {
-		log.Warn(r, "Unsuccessful login", "username", username, "request", r.Header)
-		_ = rest.RespondWithError(w, http.StatusUnauthorized, "Invalid username or password")
-		return
-	}
+		svc := auth.NewLoginService(ds)
+		user, tokenString, err := svc.Login(r.Context(), identity)
+		if err != nil {
+			_ = rest.RespondWithError(w, http.StatusInternalServerError, "Unknown error authenticating user. Please try again")
+			return
+		}
 
-	tokenString, err := auth.CreateToken(user)
-	if err != nil {
-		_ = rest.RespondWithError(w, http.StatusInternalServerError, "Unknown error authenticating user. Please try again")
-		return
+		payload := buildAuthPayload(user)
+		payload["token"] = tokenString
+		_ = rest.RespondWithJSON(w, http.StatusOK, payload)
 	}
-	payload := buildAuthPayload(user)
-	payload["token"] = tokenString
-	_ = rest.RespondWithJSON(w, http.StatusOK, payload)
 }
 
 func buildAuthPayload(user *model.User) map[string]any {
@@ -129,7 +131,24 @@ func createAdmin(ds model.DataStore) func(w http.ResponseWriter, r *http.Request
 			_ = rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		doLogin(ds, username, password, w, r)
+
+		provider := pwd.New(ds.User(r.Context()))
+		identity, err := provider.AuthenticateCredentials(r.Context(), username, password)
+		if err != nil {
+			_ = rest.RespondWithError(w, http.StatusInternalServerError, "Unknown error authenticating user. Please try again")
+			return
+		}
+
+		svc := auth.NewLoginService(ds)
+		user, tokenString, err := svc.Login(r.Context(), identity)
+		if err != nil {
+			_ = rest.RespondWithError(w, http.StatusInternalServerError, "Unknown error authenticating user. Please try again")
+			return
+		}
+
+		payload := buildAuthPayload(user)
+		payload["token"] = tokenString
+		_ = rest.RespondWithJSON(w, http.StatusOK, payload)
 	}
 }
 
@@ -150,24 +169,6 @@ func createAdminUser(ctx context.Context, ds model.DataStore, username, password
 		log.Error(ctx, "Could not create initial user", "user", initialUser, err)
 	}
 	return nil
-}
-
-func validateLogin(userRepo model.UserRepository, userName, password string) (*model.User, error) {
-	u, err := userRepo.FindByUsernameWithPassword(userName)
-	if errors.Is(err, model.ErrNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if u.Password != password {
-		return nil, nil
-	}
-	err = userRepo.UpdateLastLoginAt(u.ID)
-	if err != nil {
-		log.Error("Could not update LastLoginAt", "user", userName)
-	}
-	return u, nil
 }
 
 func JWTVerifier(next http.Handler) http.Handler {
@@ -293,44 +294,28 @@ func JWTRefresher(next http.Handler) http.Handler {
 
 func handleLoginFromHeaders(ds model.DataStore, r *http.Request) map[string]any {
 	username := UsernameFromConfig(r)
-	if username == "" {
-		username = UsernameFromExtAuthHeader(r)
-		if username == "" {
-			return nil
-		}
+	if username != "" {
+		return handleHeaderLoginWithIdentity(ds, r.Context(), &auth.Identity{
+			Provider: "config",
+			Subject:  username,
+			Username: username,
+		})
 	}
 
-	userRepo := ds.User(r.Context())
-	user, err := userRepo.FindByUsernameWithPassword(username)
-	if user == nil || err != nil {
-		log.Info(r, "User passed in header not found", "user", username)
-		// Check if this is the first user being created
-		count, _ := userRepo.CountAll()
-		isFirstUser := count == 0
-
-		newUser := model.User{
-			ID:          id.NewRandom(),
-			UserName:    username,
-			Name:        username,
-			Email:       "",
-			NewPassword: consts.PasswordAutogenPrefix + id.NewRandom(),
-			IsAdmin:     isFirstUser, // Make the first user an admin
-		}
-		err := userRepo.Put(&newUser)
-		if err != nil {
-			log.Error(r, "Could not create new user", "user", username, err)
-			return nil
-		}
-		user, err = userRepo.FindByUsernameWithPassword(username)
-		if user == nil || err != nil {
-			log.Error(r, "Created user but failed to fetch it", "user", username)
-			return nil
-		}
-	}
-
-	err = userRepo.UpdateLastLoginAt(user.ID)
+	provider := proxy.New()
+	identity, err := provider.Authenticate(r.Context(), r)
 	if err != nil {
-		log.Error(r, "Could not update LastLoginAt", "user", username, err)
+		return nil
+	}
+
+	return handleHeaderLoginWithIdentity(ds, r.Context(), identity)
+}
+
+func handleHeaderLoginWithIdentity(ds model.DataStore, ctx context.Context, identity *auth.Identity) map[string]any {
+	svc := auth.NewLoginService(ds)
+	user, err := svc.Provision(ctx, identity)
+	if err != nil {
+		log.Error(ctx, "Could not provision user from identity", "user", identity.Username, err)
 		return nil
 	}
 
