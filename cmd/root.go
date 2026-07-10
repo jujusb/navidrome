@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+	oidc_adapter "github.com/navidrome/navidrome/adapters/oidc"
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/consts"
 	"github.com/navidrome/navidrome/db"
@@ -124,6 +125,7 @@ func startServer(ctx context.Context) func() error {
 		if conf.Server.ListenBrainz.Enabled {
 			a.MountRouter("ListenBrainz Auth", consts.URLPathNativeAPI+"/listenbrainz", CreateListenBrainzRouter())
 		}
+		a.MountRouter("OIDC Auth", consts.URLPathNativeAPI+"/oauth", oidc_adapter.NewRouter(CreateDataStore()))
 		if conf.Server.Prometheus.Enabled {
 			p := CreatePrometheus()
 			// blocking call because takes <100ms but useful if fails

@@ -22,6 +22,7 @@ import radio from './radio'
 import share from './share'
 import library from './library'
 import plugin from './plugin'
+import oidc from './oidc'
 import { Player } from './audioplayer'
 import customRoutes from './routes'
 import {
@@ -170,6 +171,13 @@ const Admin = (props) => {
           <Resource
             name="plugin"
             {...plugin}
+            options={{ subMenu: 'settings' }}
+          />
+        ) : null,
+        permissions === 'admin' && config.oidcEnabled ? (
+          <Resource
+            name="oidc-config"
+            {...oidc}
             options={{ subMenu: 'settings' }}
           />
         ) : null,

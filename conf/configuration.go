@@ -103,6 +103,7 @@ type configOptions struct {
 	AuthWindowLength                time.Duration
 	PasswordEncryptionKey           string
 	ExtAuth                         extAuthOptions
+	OIDC                            oidcOptions `json:",omitzero"`
 	Plugins                         pluginsOptions
 	HTTPHeaders                     httpHeaderOptions   `json:",omitzero"`
 	Prometheus                      prometheusOptions   `json:",omitzero"`
@@ -267,6 +268,19 @@ type extAuthOptions struct {
 	TrustedSources string
 	UserHeader     string
 	LogoutURL      string
+}
+
+type oidcOptions struct {
+	Enabled       bool
+	Issuer        string
+	ClientID      string
+	ClientSecret  string //nolint:gosec
+	RedirectURL   string
+	Scopes        []string
+	AutoProvision bool
+	AdminClaim    string
+	AdminValue    string
+	GroupsClaim   string
 }
 
 type searchOptions struct {
@@ -807,6 +821,16 @@ func setViperDefaults() {
 	viper.SetDefault("extauth.userheader", "Remote-User")
 	viper.SetDefault("extauth.trustedsources", "")
 	viper.SetDefault("extauth.logouturl", "")
+	viper.SetDefault("oidc.enabled", false)
+	viper.SetDefault("oidc.issuer", "")
+	viper.SetDefault("oidc.clientid", "")
+	viper.SetDefault("oidc.clientsecret", "")
+	viper.SetDefault("oidc.redirecturl", "")
+	viper.SetDefault("oidc.scopes", []string{"openid", "profile", "email"})
+	viper.SetDefault("oidc.autoprovision", true)
+	viper.SetDefault("oidc.adminclaim", "")
+	viper.SetDefault("oidc.adminvalue", "")
+	viper.SetDefault("oidc.groupsclaim", "groups")
 	viper.SetDefault("prometheus.enabled", false)
 	viper.SetDefault("prometheus.metricspath", consts.PrometheusDefaultPath)
 	viper.SetDefault("prometheus.password", "")

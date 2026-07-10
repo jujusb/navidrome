@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import { Field, Form } from 'react-final-form'
 import { useDispatch } from 'react-redux'
@@ -16,11 +16,13 @@ import {
   useTranslate,
   useVersion,
 } from 'react-admin'
+import { jwtDecode } from 'jwt-decode'
 import Logo from '../icons/android-icon-192x192.png'
 
 import Notification from './Notification'
 import useCurrentTheme from '../themes/useCurrentTheme'
 import config from '../config'
+import { baseUrl } from '../utils'
 import { clearQueue } from '../actions'
 import { INSIGHTS_DOC_URL } from '../consts.js'
 
@@ -283,15 +285,6 @@ const FormSignUp = ({ loading, handleSubmit, validate }) => {
                     disabled={loading}
                   />
                 </div>
-                <div className={classes.input}>
-                  <Field
-                    name="confirmPassword"
-                    component={renderInput}
-                    label={translate('ra.auth.confirmPassword')}
-                    type="password"
-                    disabled={loading}
-                  />
-                </div>
               </div>
               <CardActions className={classes.actions}>
                 <Button
@@ -303,8 +296,21 @@ const FormSignUp = ({ loading, handleSubmit, validate }) => {
                   fullWidth
                 >
                   {loading && <CircularProgress size={25} thickness={2} />}
-                  {translate('ra.auth.buttonCreateAdmin')}
+                  {translate('ra.auth.sign_in')}
                 </Button>
+                {config.oidcEnabled && (
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    fullWidth
+                    className={classes.button}
+                    onClick={() => {
+                      window.location.href = baseUrl('/api/oauth/login')
+                    }}
+                  >
+                    Login with SSO
+                  </Button>
+                )}
               </CardActions>
               <InsightsNotice url={INSIGHTS_DOC_URL} />
             </Card>
@@ -322,6 +328,34 @@ const Login = ({ location }) => {
   const notify = useNotify()
   const login = useLogin()
   const dispatch = useDispatch()
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const token = params.get('token')
+    if (token) {
+      try {
+        jwtDecode(token)
+        const userId = params.get('userId') || ''
+        const username = params.get('username') || ''
+        const name = params.get('name') || ''
+        const isAdmin = params.get('isAdmin') === 'true'
+        const avatar = params.get('avatar') || ''
+
+        localStorage.setItem('token', token)
+        localStorage.setItem('userId', userId)
+        localStorage.setItem('username', username)
+        localStorage.setItem('name', name)
+        if (avatar) localStorage.setItem('avatar', avatar)
+        localStorage.setItem('role', isAdmin ? 'admin' : 'regular')
+        localStorage.setItem('is-authenticated', 'true')
+
+        window.location.hash = '#/'
+        window.location.reload()
+      } catch (e) {
+        notify('Invalid authentication token', { type: 'warning' })
+      }
+    }
+  }, [location, notify])
 
   const handleSubmit = useCallback(
     (auth) => {

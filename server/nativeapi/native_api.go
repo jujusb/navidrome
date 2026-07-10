@@ -14,6 +14,7 @@ import (
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/core"
 	"github.com/navidrome/navidrome/core/metrics"
+	oidcCfg "github.com/navidrome/navidrome/core/auth/oidc"
 	playlistsvc "github.com/navidrome/navidrome/core/playlists"
 	"github.com/navidrome/navidrome/log"
 	"github.com/navidrome/navidrome/model"
@@ -88,6 +89,7 @@ func (api *Router) routes() http.Handler {
 		r.With(adminOnlyMiddleware).Group(func(r chi.Router) {
 			api.addInspectRoute(r)
 			api.addConfigRoute(r)
+			api.addOIDCConfigRoute(r)
 			api.addUserLibraryRoute(r)
 			api.addPluginRoute(r)
 			api.RX(r, "/library", api.libs.NewRepository, true)
@@ -235,6 +237,66 @@ func (api *Router) addConfigRoute(r chi.Router) {
 	if conf.Server.DevUIShowConfig {
 		r.Get("/config/*", getConfig)
 	}
+}
+
+func (api *Router) addOIDCConfigRoute(r chi.Router) {
+	r.Route("/oidc-config", func(r chi.Router) {
+		r.Get("/", api.getOIDCConfig)
+		r.Put("/", api.saveOIDCConfig)
+	})
+}
+
+func (api *Router) getOIDCConfig(w http.ResponseWriter, r *http.Request) {
+	cfg, err := oidcCfg.LoadFromDB(r.Context(), api.ds)
+	if err != nil {
+		log.Error(r.Context(), "Error loading OIDC config", err)
+		_ = rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	cfg.ClientSecret = redactOIDCSecret(cfg.ClientSecret)
+	_ = rest.RespondWithJSON(w, http.StatusOK, cfg)
+}
+
+func (api *Router) saveOIDCConfig(w http.ResponseWriter, r *http.Request) {
+	var cfg oidcCfg.Config
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		_ = rest.RespondWithError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	existingCfg, err := oidcCfg.LoadFromDB(r.Context(), api.ds)
+	if err == nil && cfg.ClientSecret == "****" {
+		cfg.ClientSecret = existingCfg.ClientSecret
+	}
+
+	if err := oidcCfg.Save(r.Context(), api.ds, cfg); err != nil {
+		log.Error(r.Context(), "Error saving OIDC config", err)
+		_ = rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	conf.Server.OIDC.Enabled = cfg.Enabled
+	conf.Server.OIDC.Issuer = cfg.Issuer
+	conf.Server.OIDC.ClientID = cfg.ClientID
+	conf.Server.OIDC.ClientSecret = cfg.ClientSecret
+	conf.Server.OIDC.RedirectURL = cfg.RedirectURL
+	conf.Server.OIDC.Scopes = cfg.Scopes
+	conf.Server.OIDC.AutoProvision = cfg.AutoProvision
+	conf.Server.OIDC.AdminClaim = cfg.AdminClaim
+	conf.Server.OIDC.AdminValue = cfg.AdminValue
+	conf.Server.OIDC.GroupsClaim = cfg.GroupsClaim
+
+	_ = rest.RespondWithJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func redactOIDCSecret(secret string) string {
+	if secret == "" {
+		return ""
+	}
+	if len(secret) < 7 {
+		return "****"
+	}
+	return string(secret[0]) + "****" + string(secret[len(secret)-1])
 }
 
 func (api *Router) addKeepAliveRoute(r chi.Router) {

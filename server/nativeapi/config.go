@@ -22,6 +22,10 @@ var sensitiveFieldsPartialMask = []string{
 	"LastFM.Secret",
 	"Prometheus.MetricsPath",
 	"DevAutoLoginUsername",
+	"OIDC.ClientID",
+	"OIDC.ClientSecret",
+	"OIDC.Issuer",
+	"OIDC.RedirectURL",
 }
 
 // sensitiveFieldsFullMask contains configuration field names that should always be
