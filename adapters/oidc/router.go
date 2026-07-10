@@ -199,13 +199,22 @@ func (s *Router) callback(w http.ResponseWriter, r *http.Request) {
 
 func (s *Router) logout(w http.ResponseWriter, r *http.Request) {
 	idTokenHint := r.URL.Query().Get("id_token")
-	postLogoutRedirectURI := conf.Server.BaseURL + "/app"
+	postLogoutRedirectURI := s.appURL(r) + "/#/login"
 	logoutURL := s.provider.LogoutURL(postLogoutRedirectURI, idTokenHint)
+	log.Info(r.Context(), "OIDC logout", "idTokenHint", idTokenHint != "", "logoutURL", logoutURL)
 	if logoutURL == "" {
 		http.Redirect(w, r, postLogoutRedirectURI, http.StatusFound)
 		return
 	}
 	http.Redirect(w, r, logoutURL, http.StatusFound)
+}
+
+func (s *Router) appURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	return scheme + "://" + r.Host + "/app"
 }
 
 func (s *Router) status(w http.ResponseWriter, r *http.Request) {
@@ -220,7 +229,7 @@ func (s *Router) status(w http.ResponseWriter, r *http.Request) {
 		"adminClaim":    o.AdminClaim,
 		"adminValue":    o.AdminValue,
 		"groupsClaim":   o.GroupsClaim,
-		"logoutUrl":     s.provider.LogoutURL(conf.Server.BaseURL+"/app", ""),
+		"logoutUrl":     s.provider.LogoutURL(s.appURL(r), ""),
 	}
 	_ = rest.RespondWithJSON(w, http.StatusOK, resp)
 }

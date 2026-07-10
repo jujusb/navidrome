@@ -12,6 +12,7 @@ import (
 	oidc_adapter "github.com/navidrome/navidrome/adapters/oidc"
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/consts"
+	oidcCfg "github.com/navidrome/navidrome/core/auth/oidc"
 	"github.com/navidrome/navidrome/db"
 	"github.com/navidrome/navidrome/log"
 	"github.com/navidrome/navidrome/model"
@@ -115,8 +116,24 @@ func mainContext(ctx context.Context) (context.Context, context.CancelFunc) {
 // startServer starts the Navidrome web server, adding all the necessary routers.
 func startServer(ctx context.Context) func() error {
 	return func() error {
+		ds := CreateDataStore()
 		a := CreateServer()
-		oidcRouter := oidc_adapter.NewRouter(CreateDataStore())
+		oidcRouter := oidc_adapter.NewRouter(ds)
+
+		// Load OIDC config from DB and merge into conf.Server.OIDC
+		if oidcDB, err := oidcCfg.LoadFromDB(context.TODO(), ds); err == nil {
+			conf.Server.OIDC.Enabled = oidcDB.Enabled
+			conf.Server.OIDC.Issuer = oidcDB.Issuer
+			conf.Server.OIDC.ClientID = oidcDB.ClientID
+			conf.Server.OIDC.ClientSecret = oidcDB.ClientSecret
+			conf.Server.OIDC.RedirectURL = oidcDB.RedirectURL
+			conf.Server.OIDC.Scopes = oidcDB.Scopes
+			conf.Server.OIDC.AutoProvision = oidcDB.AutoProvision
+			conf.Server.OIDC.AutoRedirect = oidcDB.AutoRedirect
+			conf.Server.OIDC.AdminClaim = oidcDB.AdminClaim
+			conf.Server.OIDC.AdminValue = oidcDB.AdminValue
+			conf.Server.OIDC.GroupsClaim = oidcDB.GroupsClaim
+		}
 		a.MountRouter("Native API", consts.URLPathNativeAPI, CreateNativeAPIRouter(ctx).WithOIDCResetter(oidcRouter))
 		a.MountRouter("Subsonic API", consts.URLPathSubsonicAPI, CreateSubsonicAPIRouter(ctx))
 		a.MountRouter("Public Endpoints", consts.URLPathPublic, CreatePublicRouter())

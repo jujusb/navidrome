@@ -230,6 +230,11 @@ const OIDCSettings = () => {
             }
             label="Auto-redirect to SSO (skip login form)"
           />
+          {config.autoRedirect && (
+            <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginLeft: 0, marginTop: -8 }}>
+              Append <code>?local</code> to the login URL (e.g. <code>/app/#/login?local</code>) to access the password login form.
+            </Typography>
+          )}
 
           <TextField
             className={classes.field}
