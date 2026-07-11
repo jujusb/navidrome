@@ -59,6 +59,7 @@ type Subsonic struct {
 
 	// OpenSubsonic extensions
 	OpenSubsonicExtensions *OpenSubsonicExtensions `xml:"openSubsonicExtensions,omitempty"  json:"openSubsonicExtensions,omitempty"`
+	Authentication         *OpenSubsonicAuthentication `xml:"authentication,omitempty"            json:"authentication,omitempty"`
 	LyricsList             *LyricsList             `xml:"lyricsList,omitempty"              json:"lyricsList,omitempty"`
 	PlayQueueByIndex       *PlayQueueByIndex       `xml:"playQueueByIndex,omitempty" json:"playQueueByIndex,omitempty"`
 	TranscodeDecision      *TranscodeDecision      `xml:"transcodeDecision,omitempty"       json:"transcodeDecision,omitempty"`
@@ -595,6 +596,21 @@ type OpenSubsonicExtension struct {
 }
 
 type OpenSubsonicExtensions []OpenSubsonicExtension
+
+// OpenSubsonicAuthentication describes supported authentication methods
+type OpenSubsonicAuthentication struct {
+	Password bool              `xml:"password,attr" json:"password"`
+	Token    bool              `xml:"token,attr"    json:"token"`
+	OIDC     *OpenSubsonicOIDC `xml:"oidc,omitempty"     json:"oidc,omitempty"`
+}
+
+// OpenSubsonicOIDC describes OIDC configuration for client discovery
+type OpenSubsonicOIDC struct {
+	Enabled  bool     `xml:"enabled,attr"  json:"enabled"`
+	Issuer   string   `xml:"issuer,attr"   json:"issuer"`
+	ClientID string   `xml:"clientId,attr" json:"clientId"`
+	Scopes   []string `xml:"scopes,omitempty" json:"scopes,omitempty"`
+}
 
 type ItemGenre struct {
 	Name string `xml:"name,attr" json:"name"`

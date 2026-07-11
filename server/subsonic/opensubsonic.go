@@ -3,6 +3,7 @@ package subsonic
 import (
 	"net/http"
 
+	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/server/subsonic/responses"
 )
 
@@ -22,5 +23,21 @@ func (api *Router) GetOpenSubsonicExtensions(_ *http.Request) (*responses.Subson
 		})
 	}
 	response.OpenSubsonicExtensions = &extensions
+
+	o := conf.Server.OIDC
+	auth := &responses.OpenSubsonicAuthentication{
+		Password: true,
+		Token:    true,
+	}
+	if o.Enabled && o.Issuer != "" && o.ClientID != "" {
+		auth.OIDC = &responses.OpenSubsonicOIDC{
+			Enabled:  true,
+			Issuer:   o.Issuer,
+			ClientID: o.ClientID,
+			Scopes:   o.Scopes,
+		}
+	}
+	response.Authentication = auth
+
 	return response, nil
 }

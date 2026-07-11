@@ -19,6 +19,7 @@ import (
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/consts"
 	"github.com/navidrome/navidrome/core/auth"
+	"github.com/navidrome/navidrome/core/auth/oidc"
 	pwd "github.com/navidrome/navidrome/core/auth/password"
 	"github.com/navidrome/navidrome/core/auth/proxy"
 	"github.com/navidrome/navidrome/log"
@@ -231,6 +232,30 @@ func UsernameFromConfig(*http.Request) string {
 	return conf.Server.DevAutoLoginUsername
 }
 
+func UsernameFromOIDCBearer(r *http.Request) string {
+	bearer := extractBearerFromHeader(r)
+	if bearer == "" {
+		return ""
+	}
+	if !oidc.DefaultProvider().Enabled() {
+		return ""
+	}
+	identity, err := oidc.DefaultProvider().AuthenticateBearer(r.Context(), bearer)
+	if err != nil {
+		return ""
+	}
+	log.Trace(r, "Found username in OIDC Bearer token", "username", identity.Username)
+	return identity.Username
+}
+
+func extractBearerFromHeader(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	if len(auth) > 7 && strings.HasPrefix(strings.ToUpper(auth), "BEARER ") {
+		return auth[7:]
+	}
+	return ""
+}
+
 func contextWithUser(ctx context.Context, ds model.DataStore, username string) (context.Context, error) {
 	user, err := ds.User(ctx).FindByUsername(username)
 	if err == nil {
@@ -260,7 +285,7 @@ func authenticateRequest(ds model.DataStore, r *http.Request, findUsernameFns ..
 func Authenticator(ds model.DataStore) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx, err := authenticateRequest(ds, r, UsernameFromConfig, UsernameFromToken, UsernameFromExtAuthHeader)
+			ctx, err := authenticateRequest(ds, r, UsernameFromConfig, UsernameFromToken, UsernameFromOIDCBearer, UsernameFromExtAuthHeader)
 			if err != nil {
 				_ = rest.RespondWithError(w, http.StatusUnauthorized, "Not authenticated")
 				return

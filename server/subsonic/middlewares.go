@@ -19,6 +19,7 @@ import (
 	"github.com/navidrome/navidrome/consts"
 	"github.com/navidrome/navidrome/core"
 	"github.com/navidrome/navidrome/core/auth"
+	"github.com/navidrome/navidrome/core/auth/oidc"
 	"github.com/navidrome/navidrome/core/metrics"
 	"github.com/navidrome/navidrome/log"
 	"github.com/navidrome/navidrome/model"
@@ -28,6 +29,14 @@ import (
 	. "github.com/navidrome/navidrome/utils/gg"
 	"github.com/navidrome/navidrome/utils/req"
 )
+
+func extractBearer(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	if len(auth) > 7 && strings.HasPrefix(strings.ToUpper(auth), "BEARER ") {
+		return auth[7:]
+	}
+	return ""
+}
 
 func postFormToQueryParams(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +75,7 @@ func checkRequiredParameters(next http.Handler) http.Handler {
 		var requiredParameters []string
 
 		username, _ := fromInternalOrProxyAuth(r)
-		if username != "" {
+		if username != "" || extractBearer(r) != "" {
 			requiredParameters = []string{"v", "c"}
 		} else {
 			requiredParameters = []string{"u", "v", "c"}
@@ -105,41 +114,62 @@ func authenticate(ds model.DataStore) func(next http.Handler) http.Handler {
 			var usr *model.User
 			var err error
 
-			username, isInternalAuth := fromInternalOrProxyAuth(r)
-			if username != "" {
-				authType := If(isInternalAuth, "internal", "reverse-proxy")
-				usr, err = ds.User(ctx).FindByUsername(username)
-				if errors.Is(err, context.Canceled) {
-					log.Debug(ctx, "API: Request canceled when authenticating", "auth", authType, "username", username, "remoteAddr", r.RemoteAddr, err)
-					return
-				}
-				if errors.Is(err, model.ErrNotFound) {
-					log.Warn(ctx, "API: Invalid login", "auth", authType, "username", username, "remoteAddr", r.RemoteAddr, err)
-				} else if err != nil {
-					log.Error(ctx, "API: Error authenticating username", "auth", authType, "username", username, "remoteAddr", r.RemoteAddr, err)
+			if bearerToken := extractBearer(r); bearerToken != "" && oidc.DefaultProvider().Enabled() {
+				var identity *auth.Identity
+				identity, err = oidc.DefaultProvider().AuthenticateBearer(ctx, bearerToken)
+				if err != nil {
+					log.Warn(ctx, "API: Invalid OIDC bearer token", "remoteAddr", r.RemoteAddr, err)
+				} else {
+					usr, err = ds.User(ctx).FindByUsername(identity.Username)
+					if errors.Is(err, context.Canceled) {
+						log.Debug(ctx, "API: Request canceled when authenticating", "auth", "oidc-bearer", "username", identity.Username, "remoteAddr", r.RemoteAddr, err)
+						return
+					}
+					if errors.Is(err, model.ErrNotFound) {
+						log.Warn(ctx, "API: Invalid login", "auth", "oidc-bearer", "username", identity.Username, "remoteAddr", r.RemoteAddr, err)
+					} else if err != nil {
+						log.Error(ctx, "API: Error authenticating username", "auth", "oidc-bearer", "username", identity.Username, "remoteAddr", r.RemoteAddr, err)
+					} else {
+						ctx = request.WithUsername(ctx, identity.Username)
+					}
 				}
 			} else {
-				p := req.Params(r)
-				username, _ := p.String("u")
-				pass, _ := p.String("p")
-				token, _ := p.String("t")
-				salt, _ := p.String("s")
-				jwt, _ := p.String("jwt")
+				username, isInternalAuth := fromInternalOrProxyAuth(r)
+				if username != "" {
+					authType := If(isInternalAuth, "internal", "reverse-proxy")
+					usr, err = ds.User(ctx).FindByUsername(username)
+					if errors.Is(err, context.Canceled) {
+						log.Debug(ctx, "API: Request canceled when authenticating", "auth", authType, "username", username, "remoteAddr", r.RemoteAddr, err)
+						return
+					}
+					if errors.Is(err, model.ErrNotFound) {
+						log.Warn(ctx, "API: Invalid login", "auth", authType, "username", username, "remoteAddr", r.RemoteAddr, err)
+					} else if err != nil {
+						log.Error(ctx, "API: Error authenticating username", "auth", authType, "username", username, "remoteAddr", r.RemoteAddr, err)
+					}
+				} else {
+					p := req.Params(r)
+					username, _ := p.String("u")
+					pass, _ := p.String("p")
+					token, _ := p.String("t")
+					salt, _ := p.String("s")
+					jwt, _ := p.String("jwt")
 
-				usr, err = ds.User(ctx).FindByUsernameWithPassword(username)
-				if errors.Is(err, context.Canceled) {
-					log.Debug(ctx, "API: Request canceled when authenticating", "auth", "subsonic", "username", username, "remoteAddr", r.RemoteAddr, err)
-					return
-				}
-				switch {
-				case errors.Is(err, model.ErrNotFound):
-					log.Warn(ctx, "API: Invalid login", "auth", "subsonic", "username", username, "remoteAddr", r.RemoteAddr, err)
-				case err != nil:
-					log.Error(ctx, "API: Error authenticating username", "auth", "subsonic", "username", username, "remoteAddr", r.RemoteAddr, err)
-				default:
-					err = validateCredentials(usr, pass, token, salt, jwt)
-					if err != nil {
+					usr, err = ds.User(ctx).FindByUsernameWithPassword(username)
+					if errors.Is(err, context.Canceled) {
+						log.Debug(ctx, "API: Request canceled when authenticating", "auth", "subsonic", "username", username, "remoteAddr", r.RemoteAddr, err)
+						return
+					}
+					switch {
+					case errors.Is(err, model.ErrNotFound):
 						log.Warn(ctx, "API: Invalid login", "auth", "subsonic", "username", username, "remoteAddr", r.RemoteAddr, err)
+					case err != nil:
+						log.Error(ctx, "API: Error authenticating username", "auth", "subsonic", "username", username, "remoteAddr", r.RemoteAddr, err)
+					default:
+						err = validateCredentials(usr, pass, token, salt, jwt)
+						if err != nil {
+							log.Warn(ctx, "API: Invalid login", "auth", "subsonic", "username", username, "remoteAddr", r.RemoteAddr, err)
+						}
 					}
 				}
 			}

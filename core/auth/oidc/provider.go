@@ -429,9 +429,57 @@ func (p *OIDCIdentityProvider) fetchJWKS(cfg *oidcConfig) (*jwks, error) {
 	return p.jwks, nil
 }
 
+func (p *OIDCIdentityProvider) AuthenticateBearer(ctx context.Context, bearerToken string) (*auth.Identity, error) {
+	claims, err := p.VerifyIDToken(ctx, bearerToken, "")
+	if err != nil {
+		return nil, fmt.Errorf("oidc: bearer token verification: %w", err)
+	}
+
+	username := ""
+	o := conf.Server.OIDC
+	switch o.MatchBy {
+	case "email":
+		username = claims.Email
+	case "subject":
+		username = claims.Subject
+	default:
+		username = claims.PreferredUsername
+		if username == "" {
+			username = claims.Email
+		}
+		if username == "" {
+			username = claims.Subject
+		}
+	}
+
+	if username == "" {
+		return nil, fmt.Errorf("oidc: could not determine username from token claims")
+	}
+
+	identity := &auth.Identity{
+		Provider:    "oidc",
+		Subject:     claims.Subject,
+		Username:    username,
+		DisplayName: claims.Name,
+		Email:       claims.Email,
+		Groups:      claims.Groups,
+		Claims:      claims.All,
+	}
+	return identity, nil
+}
+
 func (p *OIDCIdentityProvider) Reset() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.config = nil
 	p.jwks = nil
+}
+
+var defaultProvider *OIDCIdentityProvider
+
+func DefaultProvider() *OIDCIdentityProvider {
+	if defaultProvider == nil {
+		defaultProvider = New()
+	}
+	return defaultProvider
 }
