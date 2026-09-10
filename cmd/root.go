@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
-	oidc_adapter "github.com/navidrome/navidrome/adapters/oidc"
+	auth_adapter "github.com/navidrome/navidrome/adapters/auth"
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/consts"
-	oidcCfg "github.com/navidrome/navidrome/core/auth/oidc"
 	"github.com/navidrome/navidrome/db"
 	"github.com/navidrome/navidrome/log"
 	"github.com/navidrome/navidrome/model"
@@ -118,27 +117,8 @@ func startServer(ctx context.Context) func() error {
 	return func() error {
 		ds := CreateDataStore()
 		a := CreateServer()
-		oidcRouter := oidc_adapter.NewRouter(ds)
-
-		// Load OIDC config from DB and merge into conf.Server.OIDC
-		if oidcDB, err := oidcCfg.LoadFromDB(context.TODO(), ds); err == nil {
-			conf.Server.OIDC.Enabled = oidcDB.Enabled
-			conf.Server.OIDC.Issuer = oidcDB.Issuer
-			conf.Server.OIDC.ClientID = oidcDB.ClientID
-			conf.Server.OIDC.ClientSecret = oidcDB.ClientSecret
-			conf.Server.OIDC.RedirectURL = oidcDB.RedirectURL
-			conf.Server.OIDC.Scopes = oidcDB.Scopes
-			conf.Server.OIDC.AutoProvision = oidcDB.AutoProvision
-			conf.Server.OIDC.AutoRedirect = oidcDB.AutoRedirect
-			conf.Server.OIDC.AdminClaim = oidcDB.AdminClaim
-			conf.Server.OIDC.AdminValue = oidcDB.AdminValue
-			conf.Server.OIDC.GroupsClaim = oidcDB.GroupsClaim
-			conf.Server.OIDC.SigningAlgorithm = oidcDB.SigningAlgorithm
-			conf.Server.OIDC.AllowedRedirectURIs = oidcDB.AllowedRedirectURIs
-			conf.Server.OIDC.ButtonText = oidcDB.ButtonText
-			conf.Server.OIDC.MatchBy = oidcDB.MatchBy
-		}
-		a.MountRouter("Native API", consts.URLPathNativeAPI, CreateNativeAPIRouter(ctx).WithOIDCResetter(oidcRouter))
+		authRouter := auth_adapter.NewRouter(ds)
+		a.MountRouter("Native API", consts.URLPathNativeAPI, CreateNativeAPIRouter(ctx))
 		a.MountRouter("Subsonic API", consts.URLPathSubsonicAPI, CreateSubsonicAPIRouter(ctx))
 		a.MountRouter("Public Endpoints", consts.URLPathPublic, CreatePublicRouter())
 		if conf.Server.LastFM.Enabled {
@@ -147,7 +127,7 @@ func startServer(ctx context.Context) func() error {
 		if conf.Server.ListenBrainz.Enabled {
 			a.MountRouter("ListenBrainz Auth", consts.URLPathNativeAPI+"/listenbrainz", CreateListenBrainzRouter())
 		}
-		a.MountRouter("OIDC Auth", consts.URLPathNativeAPI+"/oauth", oidcRouter)
+		a.MountRouter("Auth Provider", consts.URLPathNativeAPI+"/auth", authRouter)
 		if conf.Server.Prometheus.Enabled {
 			p := CreatePrometheus()
 			// blocking call because takes <100ms but useful if fails

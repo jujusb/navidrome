@@ -1,0 +1,189 @@
+version: v1-draft
+exports:
+    nd_auth_get_status:
+        description: GetStatus returns the current status and public configuration of the auth provider. The host calls this to decide whether a provider is enabled and to render the login page SSO button.
+        input:
+            $ref: '#/components/schemas/GetStatusRequest'
+            contentType: application/json
+        output:
+            $ref: '#/components/schemas/AuthStatus'
+            contentType: application/json
+    nd_auth_get_login_url:
+        description: GetLoginURL generates the authorization URL used to start a login. The host generates the state and nonce values (stored in HttpOnly cookies for CSRF protection) and passes them along with the callback redirect URI. The plugin MUST echo these values in the returned URL.
+        input:
+            $ref: '#/components/schemas/GetLoginURLRequest'
+            contentType: application/json
+        output:
+            $ref: '#/components/schemas/GetLoginURLResponse'
+            contentType: application/json
+    nd_auth_exchange_code:
+        description: ExchangeCode is called on the provider callback endpoint after the user authorizes the request. It trades the authorization code for tokens, validates them, and returns the authenticated identity. The ID token returned in AuthIdentity is stored by the host so it can be passed back later as an id_token_hint during logout.
+        input:
+            $ref: '#/components/schemas/ExchangeCodeRequest'
+            contentType: application/json
+        output:
+            $ref: '#/components/schemas/AuthIdentity'
+            contentType: application/json
+    nd_auth_verify_bearer:
+        description: VerifyBearer validates a bearer token (e.g. an OIDC ID token) passed by an API client and returns the authenticated identity. This is used by the Subsonic API and the native API to authenticate non-browser clients using the external provider's tokens.
+        input:
+            $ref: '#/components/schemas/VerifyBearerRequest'
+            contentType: application/json
+        output:
+            $ref: '#/components/schemas/AuthIdentity'
+            contentType: application/json
+    nd_auth_get_logout_url:
+        description: GetLogoutURL returns the provider's single sign-out URL. The host redirects the browser there after a Navidrome session logout. If the provider does not support single sign-out, return an empty LogoutURL.
+        input:
+            $ref: '#/components/schemas/GetLogoutURLRequest'
+            contentType: application/json
+        output:
+            $ref: '#/components/schemas/GetLogoutURLResponse'
+            contentType: application/json
+components:
+    schemas:
+        GetStatusRequest:
+            description: GetStatusRequest wraps the context the host can provide for a status query.
+            properties:
+                appUrl:
+                    type: string
+                    description: AppURL is the base URL of the Navidrome web app (e.g. https://nd.local/app). Used by the plugin to build absolute redirect/logout URLs.
+            required:
+                - appUrl
+        AuthStatus:
+            description: AuthStatus describes the provider's current state for the login page and host.
+            properties:
+                enabled:
+                    type: boolean
+                    description: Enabled indicates the provider is fully configured and can handle logins.
+                buttonText:
+                    type: string
+                    description: ButtonText is the label for the SSO button on the login page.
+                autoRedirect:
+                    type: boolean
+                    description: AutoRedirect indicates the login page should skip the local form and redirect straight to the provider.
+                providerId:
+                    type: string
+                    description: ProviderID is a stable identifier of the provider (e.g. "oidc").
+                issuer:
+                    type: string
+                    description: Issuer is the identity provider identifier, when applicable.
+                clientId:
+                    type: string
+                    description: ClientID is the public OAuth2 client identifier, when applicable.
+                scopes:
+                    type: array
+                    description: Scopes are the OAuth2 scopes requested from the provider, when applicable.
+                    items:
+                        type: string
+                logoutUrl:
+                    type: string
+                    description: LogoutURL is the provider logout URL used by the admin settings page.
+                matchBy:
+                    type: string
+                    description: MatchBy describes how usernames are derived, when applicable.
+            required:
+                - enabled
+        GetLoginURLRequest:
+            description: GetLoginURLRequest carries the values required to build an authorization URL.
+            properties:
+                state:
+                    type: string
+                    description: State is the CSRF state token generated by the host. Must be included verbatim in the authorization URL.
+                nonce:
+                    type: string
+                    description: Nonce is the request nonce generated by the host. Must be included verbatim in the authorization URL.
+                redirectUri:
+                    type: string
+                    description: RedirectURI is the callback URI the provider must redirect to after user consent.
+            required:
+                - state
+                - nonce
+                - redirectUri
+        GetLoginURLResponse:
+            description: GetLoginURLResponse is the result of GetLoginURL.
+            properties:
+                authorizationUrl:
+                    type: string
+                    description: AuthorizationURL is the full URL the browser should be redirected to.
+            required:
+                - authorizationUrl
+        ExchangeCodeRequest:
+            description: ExchangeCodeRequest carries the callback parameters for the code exchange.
+            properties:
+                code:
+                    type: string
+                    description: Code is the authorization code received on the callback.
+                state:
+                    type: string
+                    description: State is the state echoed back by the provider on the callback.
+                nonce:
+                    type: string
+                    description: Nonce is the nonce value the host stored in the login cookie.
+                redirectUri:
+                    type: string
+                    description: RedirectURI is the same redirect URI that was used to build the authorization URL.
+            required:
+                - code
+                - state
+                - nonce
+                - redirectUri
+        AuthIdentity:
+            description: AuthIdentity represents an authenticated user resolved from the provider.
+            properties:
+                provider:
+                    type: string
+                    description: Provider is the identity provider name (e.g. "oidc").
+                subject:
+                    type: string
+                    description: Subject is the provider's immutable subject identifier for the user.
+                username:
+                    type: string
+                    description: Username is the username to provision/authenticate in Navidrome.
+                email:
+                    type: string
+                    description: Email is the user's email address, if available.
+                displayName:
+                    type: string
+                    description: DisplayName is the user's display name, if available.
+                groups:
+                    type: array
+                    description: Groups are the user's group memberships, if available.
+                    items:
+                        type: string
+                isAdmin:
+                    type: boolean
+                    description: IsAdmin indicates the user should be granted admin rights. When true, the host promotes the user to admin on login.
+                idToken:
+                    type: string
+                    description: IDToken is the raw ID token (or equivalent) returned by the provider. Used as an id_token_hint during single sign-out.
+                claims:
+                    type: object
+                    description: Claims contains the raw identity claims for display or debugging.
+            required:
+                - provider
+                - subject
+                - username
+        VerifyBearerRequest:
+            description: VerifyBearerRequest carries a bearer token to validate.
+            properties:
+                token:
+                    type: string
+                    description: Token is the raw bearer token supplied by the API client.
+            required:
+                - token
+        GetLogoutURLRequest:
+            description: GetLogoutURLRequest carries the parameters for building a single sign-out URL.
+            properties:
+                postLogoutRedirectUri:
+                    type: string
+                    description: PostLogoutRedirectURI is where the provider should send the browser after the local session has been torn down.
+                idTokenHint:
+                    type: string
+                    description: IDTokenHint is the user's ID token, used as the id_token_hint parameter.
+        GetLogoutURLResponse:
+            description: GetLogoutURLResponse is the result of GetLogoutURL.
+            properties:
+                logoutUrl:
+                    type: string
+                    description: LogoutURL is the provider's single sign-out URL. Empty when the provider does not support it.

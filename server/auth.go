@@ -19,13 +19,13 @@ import (
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/consts"
 	"github.com/navidrome/navidrome/core/auth"
-	"github.com/navidrome/navidrome/core/auth/oidc"
 	pwd "github.com/navidrome/navidrome/core/auth/password"
 	"github.com/navidrome/navidrome/core/auth/proxy"
 	"github.com/navidrome/navidrome/log"
 	"github.com/navidrome/navidrome/model"
 	"github.com/navidrome/navidrome/model/id"
 	"github.com/navidrome/navidrome/model/request"
+	"github.com/navidrome/navidrome/plugins"
 	"github.com/navidrome/navidrome/utils/gravatar"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -232,20 +232,22 @@ func UsernameFromConfig(*http.Request) string {
 	return conf.Server.DevAutoLoginUsername
 }
 
-func UsernameFromOIDCBearer(r *http.Request) string {
-	bearer := extractBearerFromHeader(r)
-	if bearer == "" {
-		return ""
+// UsernameFromPluginBearer returns a function that validates the request's
+// bearer token against the single active auth provider plugin and, if valid,
+// returns the corresponding username.
+func UsernameFromPluginBearer(ds model.DataStore) func(r *http.Request) string {
+	return func(r *http.Request) string {
+		bearer := extractBearerFromHeader(r)
+		if bearer == "" {
+			return ""
+		}
+		identity, err := plugins.AuthenticateBearer(r.Context(), ds, bearer)
+		if err != nil {
+			return ""
+		}
+		log.Trace(r, "Found username in auth provider bearer token", "username", identity.Username)
+		return identity.Username
 	}
-	if !oidc.DefaultProvider().Enabled() {
-		return ""
-	}
-	identity, err := oidc.DefaultProvider().AuthenticateBearer(r.Context(), bearer)
-	if err != nil {
-		return ""
-	}
-	log.Trace(r, "Found username in OIDC Bearer token", "username", identity.Username)
-	return identity.Username
 }
 
 func extractBearerFromHeader(r *http.Request) string {
@@ -285,7 +287,7 @@ func authenticateRequest(ds model.DataStore, r *http.Request, findUsernameFns ..
 func Authenticator(ds model.DataStore) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx, err := authenticateRequest(ds, r, UsernameFromConfig, UsernameFromToken, UsernameFromOIDCBearer, UsernameFromExtAuthHeader)
+			ctx, err := authenticateRequest(ds, r, UsernameFromConfig, UsernameFromToken, UsernameFromPluginBearer(ds), UsernameFromExtAuthHeader)
 			if err != nil {
 				_ = rest.RespondWithError(w, http.StatusUnauthorized, "Not authenticated")
 				return

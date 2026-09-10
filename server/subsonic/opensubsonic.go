@@ -1,9 +1,10 @@
 package subsonic
 
 import (
+	"context"
 	"net/http"
 
-	"github.com/navidrome/navidrome/conf"
+	"github.com/navidrome/navidrome/plugins"
 	"github.com/navidrome/navidrome/server/subsonic/responses"
 )
 
@@ -24,17 +25,21 @@ func (api *Router) GetOpenSubsonicExtensions(_ *http.Request) (*responses.Subson
 	}
 	response.OpenSubsonicExtensions = &extensions
 
-	o := conf.Server.OIDC
 	auth := &responses.OpenSubsonicAuthentication{
 		Password: true,
 		Token:    true,
 	}
-	if o.Enabled && o.Issuer != "" && o.ClientID != "" {
-		auth.OIDC = &responses.OpenSubsonicOIDC{
-			Enabled:  true,
-			Issuer:   o.Issuer,
-			ClientID: o.ClientID,
-			Scopes:   o.Scopes,
+	m := plugins.GetManager(api.ds, api.broker, nil)
+	provider, ok := m.ActiveAuthProvider(context.Background())
+	if ok {
+		status := provider.GetStatus(context.Background())
+		if status.Enabled && status.Issuer != "" && status.ClientID != "" {
+			auth.OIDC = &responses.OpenSubsonicOIDC{
+				Enabled:  true,
+				Issuer:   status.Issuer,
+				ClientID: status.ClientID,
+				Scopes:   status.Scopes,
+			}
 		}
 	}
 	response.Authentication = auth

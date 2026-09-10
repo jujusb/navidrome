@@ -1,0 +1,13 @@
+
+This pull request introduces OpenID Connect (OIDC) authentication to the application, providing a new, standards-based way for users to authenticate. It adds a modular authentication framework with support for OIDC, password, and proxy-based identity providers. The changes include new configuration options, a router for OIDC endpoints, and logic to load and merge OIDC configuration from both the config file and the database.
+
+**OIDC Authentication Integration:**
+
+* Added a new `oidcOptions` struct to `conf/configuration.go` and set up default OIDC-related configuration options, enabling OIDC to be configured via config file or environment variables. [[1]](diffhunk://#diff-5b7f9f2790a5795a69654b2ba8c72112da865800efa1110b181c6c70de96c9dbR106) [[2]](diffhunk://#diff-5b7f9f2790a5795a69654b2ba8c72112da865800efa1110b181c6c70de96c9dbR273-R290) [[3]](diffhunk://#diff-5b7f9f2790a5795a69654b2ba8c72112da865800efa1110b181c6c70de96c9dbR829-R843)
+* Implemented an OIDC router (`adapters/oidc/router.go`) that provides `/login`, `/callback`, `/status`, and `/logout` endpoints for OIDC authentication flows.
+* Added logic to load OIDC configuration from the database and merge it with file-based configuration, ensuring runtime updates are possible (`core/auth/oidc/config.go`).
+* Integrated the OIDC router into the main server startup, mounting it at `/api/oauth` and ensuring configuration is loaded at startup (`cmd/root.go`). [[1]](diffhunk://#diff-ab967ab1a2f3a1b769106eeb7bfe892ef0e81d1d27811fa15be08e6749feee1fR12-R15) [[2]](diffhunk://#diff-ab967ab1a2f3a1b769106eeb7bfe892ef0e81d1d27811fa15be08e6749feee1fR119-R141) [[3]](diffhunk://#diff-ab967ab1a2f3a1b769106eeb7bfe892ef0e81d1d27811fa15be08e6749feee1fR150)
+
+**Authentication Framework Refactor:**
+
+* Introduced a new `Identity` struct and `IdentityProvider` interface (`core/auth/identity.go`), and implemented identity providers for password-based (`core/auth/password/provider.go`) and proxy-based (`core/auth/proxy/provider.go`) authentication. [[1]](diffhunk://#diff-56cdbe679d9a9434ac32a637d6167ec9b9ae08823801745b58f9d790b3af6489R1-R27) [[2]](diffhunk://#diff-60d9b49f0055ea371ac961fa1034de7cbc456f5eec88828197aa8a508c2b9815R1-R53) [[3]](diffhunk://#diff-19220ecdaf09de38ccba1c74e083e86e41dbe89f7dc50b405d31a95f0d5cfe13R1-R88)sss

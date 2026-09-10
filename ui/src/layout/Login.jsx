@@ -185,7 +185,7 @@ const FormLogin = ({ loading, handleSubmit, validate, oidcEnabled, oidcButtonTex
                     fullWidth
                     className={classes.button}
                     onClick={() => {
-                      window.location.href = baseUrl('/api/oauth/login')
+                      window.location.href = baseUrl('/api/auth/login')
                     }}
                   >
                     {oidcButtonText || 'Login with SSO'}
@@ -285,16 +285,16 @@ const Login = ({ location }) => {
   const dispatch = useDispatch()
 
   useEffect(() => {
-    const checkOIDC = () => {
-      fetch(baseUrl('/api/oauth/status'))
+    const checkAuthProvider = () => {
+      fetch(baseUrl('/api/auth/status'))
         .then((res) => res.json())
         .then((data) => {
-          if (data && data.issuer && data.clientId && data.enabled) {
+          if (data && data.enabled) {
             setOidcEnabled(true)
             if (data.buttonText) setOidcButtonText(data.buttonText)
             const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
             if (data.autoRedirect && !params.has('local') && !window.location.hash.includes('token=')) {
-              window.location.href = baseUrl('/api/oauth/login')
+              window.location.href = baseUrl('/api/auth/login')
             }
           } else {
             setOidcEnabled(false)
@@ -302,9 +302,9 @@ const Login = ({ location }) => {
         })
         .catch(() => {})
     }
-    checkOIDC()
-    window.addEventListener('focus', checkOIDC)
-    return () => window.removeEventListener('focus', checkOIDC)
+    checkAuthProvider()
+    window.addEventListener('focus', checkAuthProvider)
+    return () => window.removeEventListener('focus', checkAuthProvider)
   }, [])
 
   useEffect(() => {

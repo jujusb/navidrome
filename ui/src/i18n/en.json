@@ -410,9 +410,6 @@
       "placeholders": {
         "configKey": "key",
         "configValue": "value"
-      },
-      "oidc-config": {
-        "name": "OIDC Authentication"
       }
     }
   },

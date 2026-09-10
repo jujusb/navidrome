@@ -19,6 +19,12 @@ type Identity struct {
 	DisplayName string
 	Groups      []string
 	Claims      map[string]any
+	// IsAdmin indicates the provider wants this user to be granted admin
+	// rights. Only set by auth provider plugins.
+	IsAdmin bool
+	// IDToken is the raw ID token returned by an auth provider plugin,
+	// used as an id_token_hint during single sign-out.
+	IDToken string
 }
 
 type IdentityProvider interface {

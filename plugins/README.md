@@ -22,6 +22,7 @@ The plugin system is built on **[Extism](https://extism.org/)**, a cross-languag
   - [Lyrics](#lyrics)
   - [SonicSimilarity](#sonicsimilarity)
   - [TaskWorker](#taskworker)
+  - [AuthProvider](#authprovider)
   - [Lifecycle](#lifecycle)
   - [SchedulerCallback](#schedulercallback)
   - [WebSocketCallback](#websocketcallback)
@@ -332,6 +333,55 @@ Processes tasks from a queue. The method is **optional** — export it if your p
 | `nd_task_execute`   | `{queueName, taskID, payload, attempt}`     | `string`| Execute a queued task|
 
 The `payload` is raw bytes (the same bytes passed to `TaskEnqueue`). The `attempt` counter starts at 1 and increments on retries. Return a string result on success.
+
+### AuthProvider
+
+Implements sign-on through an external identity provider (e.g. OIDC/OAuth2). Only **one** auth provider plugin can be active at a time — the first plugin whose `GetStatus` returns `enabled: true` is used. All five methods are **required**.
+
+The plugin is responsible for all protocol-level work: provider discovery, authorization URL generation, token exchange, token/bearer verification and identity claim extraction. The host handles HTTP routing (`/api/auth/login|callback|status|logout`), CSRF `state`/`nonce` cookies, user provisioning and JWT session creation.
+
+| Function                          | Input                                            | Output                                   | Description                        |
+|-----------------------------------|--------------------------------------------------|------------------------------------------|------------------------------------|
+| `nd_auth_get_status`              | `{appUrl}`                                       | `{enabled, providerId, buttonText, ...}` | Provider status/public config      |
+| `nd_auth_get_login_url`           | `{state, nonce, redirectUri}`                    | `{authorizationUrl}`                     | Build the authorization URL        |
+| `nd_auth_exchange_code`           | `{code, state, nonce, redirectUri}`              | `{provider, subject, username, ...}`     | Trade code for identity            |
+| `nd_auth_verify_bearer`           | `{token}`                                        | `{provider, subject, username, ...}`     | Verify an API client bearer token  |
+| `nd_auth_get_logout_url`          | `{postLogoutRedirectUri, idTokenHint}`           | `{logoutUrl}`                            | Single sign-out URL (may be empty) |
+
+**Status response:**
+
+```json
+{
+  "enabled": true,
+  "providerId": "oidc",
+  "buttonText": "Login with SSO",
+  "autoRedirect": false,
+  "issuer": "https://auth.example.com",
+  "clientId": "navidrome",
+  "scopes": ["openid", "profile", "email"],
+  "matchBy": "preferred_username"
+}
+```
+
+**Identity response:**
+
+```json
+{
+  "provider": "oidc",
+  "subject": "abc123",
+  "username": "john",
+  "email": "john@example.com",
+  "displayName": "John Doe",
+  "groups": ["users"],
+  "isAdmin": true,
+  "idToken": "eyJ...",
+  "claims": {}
+}
+```
+
+When `isAdmin` is `true`, the host promotes the user to admin on login. The `idToken` is stored by the host and passed back as `id_token_hint` during logout. The `auth_state`/`auth_nonce` cookies must be echoed verbatim in the authorization URL (`state`/`nonce` parameters).
+
+Auth provider plugins typically require the `http` permission (set `allowPrivateHosts: true` to reach identity providers on private networks) and declare a config schema for issuer, client credentials, scopes and claim mapping. See `plugins/bundled/oidc/` for a full implementation.
 
 ### Lifecycle
 

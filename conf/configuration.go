@@ -103,7 +103,6 @@ type configOptions struct {
 	AuthWindowLength                time.Duration
 	PasswordEncryptionKey           string
 	ExtAuth                         extAuthOptions
-	OIDC                            oidcOptions `json:",omitzero"`
 	Plugins                         pluginsOptions
 	HTTPHeaders                     httpHeaderOptions   `json:",omitzero"`
 	Prometheus                      prometheusOptions   `json:",omitzero"`
@@ -268,24 +267,6 @@ type extAuthOptions struct {
 	TrustedSources string
 	UserHeader     string
 	LogoutURL      string
-}
-
-type oidcOptions struct {
-	Enabled             bool     `mapstructure:"enabled"`
-	Issuer              string   `mapstructure:"issuer"`
-	ClientID            string   `mapstructure:"clientid"`
-	ClientSecret        string   `mapstructure:"clientsecret"` //nolint:gosec
-	RedirectURL         string   `mapstructure:"redirecturl"`
-	Scopes              []string `mapstructure:"scopes"`
-	AutoProvision       bool     `mapstructure:"autoprovision"`
-	AutoRedirect        bool     `mapstructure:"autoredirect"`
-	AdminClaim          string   `mapstructure:"adminclaim"`
-	AdminValue          string   `mapstructure:"adminvalue"`
-	GroupsClaim         string   `mapstructure:"groupsclaim"`
-	SigningAlgorithm    string   `mapstructure:"signingalgorithm"`
-	AllowedRedirectURIs []string `mapstructure:"allowedredirecturis"`
-	ButtonText          string   `mapstructure:"buttontext"`
-	MatchBy             string   `mapstructure:"matchby"`
 }
 
 type searchOptions struct {
@@ -826,21 +807,6 @@ func setViperDefaults() {
 	viper.SetDefault("extauth.userheader", "Remote-User")
 	viper.SetDefault("extauth.trustedsources", "")
 	viper.SetDefault("extauth.logouturl", "")
-	viper.SetDefault("oidc.enabled", false)
-	viper.SetDefault("oidc.issuer", "")
-	viper.SetDefault("oidc.clientid", "")
-	viper.SetDefault("oidc.clientsecret", "")
-	viper.SetDefault("oidc.redirecturl", "")
-	viper.SetDefault("oidc.scopes", []string{"openid", "profile", "email"})
-	viper.SetDefault("oidc.autoprovision", true)
-	viper.SetDefault("oidc.autoredirect", false)
-	viper.SetDefault("oidc.adminclaim", "")
-	viper.SetDefault("oidc.adminvalue", "")
-	viper.SetDefault("oidc.groupsclaim", "groups")
-	viper.SetDefault("oidc.signingalgorithm", "RS256")
-	viper.SetDefault("oidc.allowedredirecturis", []string{"navidrome://oauth"})
-	viper.SetDefault("oidc.buttontext", "Login with SSO")
-	viper.SetDefault("oidc.matchby", "username")
 	viper.SetDefault("prometheus.enabled", false)
 	viper.SetDefault("prometheus.metricspath", consts.PrometheusDefaultPath)
 	viper.SetDefault("prometheus.password", "")

@@ -30,20 +30,20 @@ var noFollowRedirectsKey = contextKey{}
 
 // httpServiceImpl implements host.HTTPService.
 type httpServiceImpl struct {
-	pluginName    string
-	requiredHosts []string
-	client        *http.Client
+	pluginName        string
+	requiredHosts     []string
+	allowPrivateHosts bool
+	client            *http.Client
 }
 
 // newHTTPService creates a new HTTPService for a plugin.
 func newHTTPService(pluginName string, permission *HTTPPermission) *httpServiceImpl {
-	var requiredHosts []string
-	if permission != nil {
-		requiredHosts = permission.RequiredHosts
-	}
 	svc := &httpServiceImpl{
-		pluginName:    pluginName,
-		requiredHosts: requiredHosts,
+		pluginName: pluginName,
+	}
+	if permission != nil {
+		svc.requiredHosts = permission.RequiredHosts
+		svc.allowPrivateHosts = permission.AllowPrivateHosts
 	}
 	svc.client = &http.Client{
 		Transport: http.DefaultTransport,
@@ -142,7 +142,8 @@ func (s *httpServiceImpl) Send(ctx context.Context, request host.HTTPRequest) (*
 
 // validateHost checks whether a request to the given host is permitted.
 // When requiredHosts is set, it checks against the allowlist.
-// When requiredHosts is empty, it blocks private/loopback IPs to prevent SSRF.
+// When requiredHosts is empty, it blocks private/loopback IPs to prevent SSRF,
+// unless allowPrivateHosts is enabled (used by auth provider plugins).
 func (s *httpServiceImpl) validateHost(ctx context.Context, hostStr string) error {
 	hostname := extractHostname(hostStr)
 
@@ -153,8 +154,12 @@ func (s *httpServiceImpl) validateHost(ctx context.Context, hostStr string) erro
 		return nil
 	}
 
-	// No explicit allowlist: block private/loopback IPs
+	// No explicit allowlist: block private/loopback IPs unless the plugin is
+	// explicitly allowed to reach them (auth providers may run privately).
 	if isPrivateOrLoopback(hostname) {
+		if s.allowPrivateHosts {
+			return nil
+		}
 		log.Warn(ctx, "HTTP request to private/loopback address blocked", "plugin", s.pluginName, "host", hostStr)
 		return fmt.Errorf("host %q is not allowed: private/loopback addresses require explicit requiredHosts in manifest", hostStr)
 	}

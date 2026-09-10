@@ -72,7 +72,7 @@ const authProvider = {
       return Promise.resolve(false)
     }
     if (idToken) {
-      window.location.href = baseUrl('/api/oauth/logout?id_token=' + encodeURIComponent(idToken))
+      window.location.href = baseUrl('/api/auth/logout?id_token=' + encodeURIComponent(idToken))
       return Promise.resolve(false)
     }
     return Promise.resolve()

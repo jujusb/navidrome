@@ -156,6 +156,11 @@
           "items": {
             "type": "string"
           }
+        },
+        "allowPrivateHosts": {
+          "type": "boolean",
+          "description": "Whether private and loopback addresses are allowed even without an explicit host allowlist. Required for auth providers running on private networks.",
+          "default": false
         }
       }
     },

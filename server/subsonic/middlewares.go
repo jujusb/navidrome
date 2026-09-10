@@ -19,11 +19,11 @@ import (
 	"github.com/navidrome/navidrome/consts"
 	"github.com/navidrome/navidrome/core"
 	"github.com/navidrome/navidrome/core/auth"
-	"github.com/navidrome/navidrome/core/auth/oidc"
 	"github.com/navidrome/navidrome/core/metrics"
 	"github.com/navidrome/navidrome/log"
 	"github.com/navidrome/navidrome/model"
 	"github.com/navidrome/navidrome/model/request"
+	"github.com/navidrome/navidrome/plugins"
 	"github.com/navidrome/navidrome/server"
 	"github.com/navidrome/navidrome/server/subsonic/responses"
 	. "github.com/navidrome/navidrome/utils/gg"
@@ -114,21 +114,21 @@ func authenticate(ds model.DataStore) func(next http.Handler) http.Handler {
 			var usr *model.User
 			var err error
 
-			if bearerToken := extractBearer(r); bearerToken != "" && oidc.DefaultProvider().Enabled() {
+			if bearerToken := extractBearer(r); bearerToken != "" {
 				var identity *auth.Identity
-				identity, err = oidc.DefaultProvider().AuthenticateBearer(ctx, bearerToken)
+				identity, err = plugins.AuthenticateBearer(ctx, ds, bearerToken)
 				if err != nil {
-					log.Warn(ctx, "API: Invalid OIDC bearer token", "remoteAddr", r.RemoteAddr, err)
+					log.Warn(ctx, "API: Invalid auth provider bearer token", "remoteAddr", r.RemoteAddr, err)
 				} else {
 					usr, err = ds.User(ctx).FindByUsername(identity.Username)
 					if errors.Is(err, context.Canceled) {
-						log.Debug(ctx, "API: Request canceled when authenticating", "auth", "oidc-bearer", "username", identity.Username, "remoteAddr", r.RemoteAddr, err)
+						log.Debug(ctx, "API: Request canceled when authenticating", "auth", "auth-provider-bearer", "username", identity.Username, "remoteAddr", r.RemoteAddr, err)
 						return
 					}
 					if errors.Is(err, model.ErrNotFound) {
-						log.Warn(ctx, "API: Invalid login", "auth", "oidc-bearer", "username", identity.Username, "remoteAddr", r.RemoteAddr, err)
+						log.Warn(ctx, "API: Invalid login", "auth", "auth-provider-bearer", "username", identity.Username, "remoteAddr", r.RemoteAddr, err)
 					} else if err != nil {
-						log.Error(ctx, "API: Error authenticating username", "auth", "oidc-bearer", "username", identity.Username, "remoteAddr", r.RemoteAddr, err)
+						log.Error(ctx, "API: Error authenticating username", "auth", "auth-provider-bearer", "username", identity.Username, "remoteAddr", r.RemoteAddr, err)
 					} else {
 						ctx = request.WithUsername(ctx, identity.Username)
 					}

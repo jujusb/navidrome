@@ -62,6 +62,7 @@ xtp plugin init --schema-file plugins/capabilities/websocket_callback.yaml \
 |--------------------|---------------------------|-------------------------------------------------------------|
 | Metadata Agent     | `metadata_agent.yaml`     | Fetch artist biographies, album images, and similar artists |
 | Scrobbler          | `scrobbler.yaml`          | Report listening activity to external services              |
+| Auth Provider      | `auth_provider.yaml`      | External authentication/identity provider (e.g. OIDC)       |
 | Lifecycle          | `lifecycle.yaml`          | Plugin initialization callbacks                             |
 | Scheduler Callback | `scheduler_callback.yaml` | Scheduled task execution                                    |
 | WebSocket Callback | `websocket_callback.yaml` | Real-time WebSocket message handling                        |

@@ -1,0 +1,125 @@
+{
+  "name": "OIDC",
+  "author": "Navidrome",
+  "version": "1.0.0",
+  "description": "OpenID Connect / OAuth2 SSO authentication provider for Navidrome",
+  "website": "https://navidrome.org",
+  "permissions": {
+    "http": {
+      "reason": "Perform OpenID provider discovery, fetch JWKS and exchange authorization codes",
+      "allowPrivateHosts": true
+    },
+    "kvstore": {
+      "reason": "Cache the OpenID discovery document and JWKS for token verification",
+      "maxSize": "1MB"
+    }
+  },
+  "config": {
+    "schema": {
+      "type": "object",
+      "required": ["issuer", "clientId", "clientSecret"],
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "title": "Issuer",
+          "description": "The OIDC issuer URL (e.g. https://accounts.google.com)",
+          "format": "uri"
+        },
+        "clientId": {
+          "type": "string",
+          "title": "Client ID",
+          "description": "The OAuth2 client ID"
+        },
+        "clientSecret": {
+          "type": "string",
+          "title": "Client Secret",
+          "description": "The OAuth2 client secret"
+        },
+        "scopes": {
+          "type": "array",
+          "title": "Scopes",
+          "items": {
+            "type": "string"
+          },
+          "default": ["openid", "profile", "email"]
+        },
+        "matchBy": {
+          "type": "string",
+          "title": "Match By",
+          "description": "Which claim is used as the username",
+          "enum": ["preferred_username", "email", "subject"],
+          "default": "preferred_username"
+        },
+        "adminClaim": {
+          "type": "string",
+          "title": "Admin Claim",
+          "description": "Claim checked to promote a user to admin (leave empty to disable)"
+        },
+        "adminValue": {
+          "type": "string",
+          "title": "Admin Value",
+          "description": "Value the admin claim must match"
+        },
+        "autoRedirect": {
+          "type": "boolean",
+          "title": "Auto Redirect",
+          "description": "Redirect to the provider directly on the login page",
+          "default": false
+        },
+        "buttonText": {
+          "type": "string",
+          "title": "Button Text",
+          "description": "Label of the SSO button on the login page",
+          "default": "Login with SSO"
+        }
+      }
+    },
+    "uiSchema": {
+      "type": "VerticalLayout",
+      "elements": [
+        {
+          "type": "Control",
+          "scope": "#/properties/issuer",
+          "options": {
+            "autofocus": true
+          }
+        },
+        {
+          "type": "Control",
+          "scope": "#/properties/clientId"
+        },
+        {
+          "type": "Control",
+          "scope": "#/properties/clientSecret",
+          "options": {
+            "format": "password"
+          }
+        },
+        {
+          "type": "Control",
+          "scope": "#/properties/scopes"
+        },
+        {
+          "type": "Control",
+          "scope": "#/properties/matchBy"
+        },
+        {
+          "type": "Control",
+          "scope": "#/properties/adminClaim"
+        },
+        {
+          "type": "Control",
+          "scope": "#/properties/adminValue"
+        },
+        {
+          "type": "Control",
+          "scope": "#/properties/autoRedirect"
+        },
+        {
+          "type": "Control",
+          "scope": "#/properties/buttonText"
+        }
+      ]
+    }
+  }
+}

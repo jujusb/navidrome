@@ -42,6 +42,33 @@ var _ = Describe("Capabilities", func() {
 			Expect(caps).To(HaveLen(1)) // Should only have one MetadataAgent capability
 		})
 
+		It("detects AuthProvider capability when plugin exports a single auth function", func() {
+			checker := &mockFunctionChecker{
+				functions: map[string]bool{
+					FuncAuthGetStatus: true,
+				},
+			}
+
+			caps := detectCapabilities(checker)
+			Expect(caps).To(ContainElement(CapabilityAuthProvider))
+		})
+
+		It("detects AuthProvider capability when plugin exports all auth functions", func() {
+			checker := &mockFunctionChecker{
+				functions: map[string]bool{
+					FuncAuthGetStatus:    true,
+					FuncAuthGetLoginURL:  true,
+					FuncAuthExchangeCode: true,
+					FuncAuthVerifyBearer: true,
+					FuncAuthGetLogoutURL: true,
+				},
+			}
+
+			caps := detectCapabilities(checker)
+			Expect(caps).To(ContainElement(CapabilityAuthProvider))
+			Expect(caps).To(HaveLen(1))
+		})
+
 		It("returns empty slice when no capability functions are exported", func() {
 			checker := &mockFunctionChecker{
 				functions: map[string]bool{

@@ -59,6 +59,12 @@ type HTTPPermission struct {
 	// List of required host patterns for HTTP requests (e.g., 'api.example.com',
 	// '*.musicbrainz.org')
 	RequiredHosts []string `json:"requiredHosts,omitempty" yaml:"requiredHosts,omitempty" mapstructure:"requiredHosts,omitempty"`
+
+	// Whether private and loopback addresses are allowed even without an explicit
+	// host allowlist. This is required for auth providers that run on private
+	// networks (e.g. Keycloak in Docker). Only meaningful when the plugin also
+	// declares the auth_provider capability.
+	AllowPrivateHosts bool `json:"allowPrivateHosts,omitempty" yaml:"allowPrivateHosts,omitempty" mapstructure:"allowPrivateHosts,omitempty"`
 }
 
 // Key-value store permissions for persistent plugin storage
